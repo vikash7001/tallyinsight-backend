@@ -1,27 +1,42 @@
-const express = require('express');
-const auth = require('./middleware/auth');
-const companyContext = require('./middleware/companyContext');
-const licenseResolver = require('./middleware/licenseResolver');
+const express = require("express");
 
-const authRoutes = require('./routes/auth.routes');
-const userAuthRoutes = require('./routes/auth.user');
-const syncRoutes = require('./routes/sync.routes');
+const authMiddleware = require("./middleware/auth");
+const companyContext = require("./middleware/companyContext");
+const licenseResolver = require("./middleware/licenseResolver");
+
+const authRoutes = require("./routes/auth.routes");      // admin auth
+const userAuthRoutes = require("./routes/auth.user");    // mobile login
+const syncRoutes = require("./routes/sync.routes");
 
 const app = express();
+
 app.use(express.json());
 
-// 🔓 PUBLIC user login
-app.use('/auth/user', userAuthRoutes);
+/* =====================
+   PUBLIC ROUTES
+   ===================== */
 
-// admin auth (if any)
-app.use('/auth', authRoutes);
+// Mobile user login (NO JWT, NO CONTEXT)
+app.use("/auth/user", userAuthRoutes);
 
-// 🔒 protected middleware (GLOBAL)
-app.use(auth);
-app.use(companyContext);
-app.use(licenseResolver);
+// Admin login (NO JWT)
+app.use("/auth", authRoutes);
 
-// protected routes
-app.use('/sync', syncRoutes);
+// Health check (important for Render & sanity)
+app.get("/", (req, res) => {
+  res.json({ status: "TallyInsight API running" });
+});
+
+/* =====================
+   PROTECTED ROUTES
+   ===================== */
+
+app.use(
+  "/sync",
+  authMiddleware("user"),   // requires JWT
+  companyContext,           // requires req.user.companyId
+  licenseResolver,          // requires company context
+  syncRoutes
+);
 
 module.exports = app;
