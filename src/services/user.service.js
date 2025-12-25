@@ -9,7 +9,7 @@ exports.userLogin = async (req, res) => {
     return res.status(400).json({ error: 'MISSING_CREDENTIALS' });
 
   const userRes = await pool.query(
-    `SELECT user_id, password_hash, company_id, is_active
+    `SELECT id, password_hash, company_id, is_active
      FROM app_users
      WHERE username = $1`,
     [username]
@@ -28,15 +28,13 @@ exports.userLogin = async (req, res) => {
     return res.status(401).json({ error: 'INVALID_LOGIN' });
 
   const token = signToken({
-    user_id: user.user_id,
-    company_id: user.company_id,
-    type: 'user'
+    userId: user.id,
+    companyId: user.company_id,
+    role: 'user'
   });
 
   res.json({
     token,
-    company_id: user.company_id
+    companyId: user.company_id
   });
 };
-
-// createUser unchanged
