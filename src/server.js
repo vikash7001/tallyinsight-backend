@@ -1,6 +1,5 @@
-const app = require('./app');
-const { port } = require('./config/env');
+const PORT = process.env.PORT || 10000;
 
-app.listen(port, () => {
-  console.log(`TallyInsight API running on port ${port}`);
+app.listen(PORT, () => {
+  console.log(`TallyInsight API running on port ${PORT}`);
 });
