@@ -46,7 +46,6 @@ app.use(
   "/mobile/feed",
   authMiddleware("user"),
   companyContext,
-  licenseResolver,
   mobileFeedRoutes
 );
 
