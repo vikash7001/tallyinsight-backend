@@ -7,6 +7,7 @@ const licenseResolver = require("./middleware/licenseResolver");
 const authRoutes = require("./routes/auth.routes");      // admin auth
 const userAuthRoutes = require("./routes/auth.user");    // mobile login
 const syncRoutes = require("./routes/sync.routes");
+const mobileFeedRoutes = require("./routes/mobile.feed"); // ✅ MOBILE FEED
 
 const app = express();
 
@@ -22,7 +23,7 @@ app.use("/auth/user", userAuthRoutes);
 // Admin login (NO JWT)
 app.use("/auth", authRoutes);
 
-// Health check (important for Render & sanity)
+// Health check (Render + sanity)
 app.get("/", (req, res) => {
   res.json({ status: "TallyInsight API running" });
 });
@@ -31,12 +32,22 @@ app.get("/", (req, res) => {
    PROTECTED ROUTES
    ===================== */
 
+// Stock sync (existing)
 app.use(
   "/sync",
-  authMiddleware("user"),   // requires JWT
-  companyContext,           // requires req.user.companyId
-  licenseResolver,          // requires company context
+  authMiddleware("user"),
+  companyContext,
+  licenseResolver,
   syncRoutes
+);
+
+// ✅ MOBILE FEED (FINAL FIX)
+app.use(
+  "/mobile/feed",
+  authMiddleware("user"),
+  companyContext,
+  licenseResolver,
+  mobileFeedRoutes
 );
 
 module.exports = app;
