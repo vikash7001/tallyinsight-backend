@@ -1,8 +1,8 @@
 module.exports = (req, res, next) => {
-  if (!req.user || !req.user.company_id) {
+  if (!req.user || !req.user.companyId) {
     return res.status(400).json({ error: 'NO_COMPANY_CONTEXT' });
   }
 
-  req.companyId = req.user.company_id;
+  req.companyId = req.user.companyId;
   next();
 };
