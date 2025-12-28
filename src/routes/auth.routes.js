@@ -1,47 +1,44 @@
 import express from 'express';
-import { supabaseAuth, supabaseAdmin } from '../config/supabase.js';
+import { supabaseAdmin } from '../config/supabase.js';
 
 const router = express.Router();
 
 router.post('/login', async (req, res) => {
-  try {
-    const { email, password } = req.body;
+  const { email, password } = req.body;
 
-    // 1️⃣ Authenticate user
-    const { data: authData, error: authError } =
-      await supabaseAuth.auth.signInWithPassword({
-        email,
-        password,
-      });
+  // 1. Auth
+  const { data, error } = await supabaseAdmin.auth.signInWithPassword({
+    email,
+    password
+  });
 
-    if (authError || !authData?.user || !authData?.session) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
-
-    const userId = authData.user.id;
-
-    // 2️⃣ FETCH COMPANIES USING ADMIN CLIENT (🔥 FIX)
-    const { data: rows, error } = await supabaseAdmin
-      .from('admin_companies')
-      .select('company_id')
-      .eq('admin_id', userId);
-
-    if (error) {
-      console.error('Company query error:', error);
-      return res.status(500).json({ error: 'Company lookup failed' });
-    }
-
-    const companies = (rows ?? []).map(r => r.company_id);
-
-    return res.json({
-      access_token: authData.session.access_token,
-      companies
-    });
-
-  } catch (err) {
-    console.error('Login error:', err);
-    return res.status(500).json({ error: 'Server error' });
+  if (error) {
+    return res.status(401).json({ error: 'Invalid credentials' });
   }
+
+  const authUserId = data.user.id;
+
+  // 2. Fetch app user
+  const { data: appUser, error: userErr } = await supabaseAdmin
+    .from('app_users')
+    .select('company_id, role, active')
+    .eq('auth_uid', authUserId)
+    .single();
+
+  if (userErr || !appUser) {
+    return res.status(403).json({ error: 'User not registered in app' });
+  }
+
+  if (!appUser.active) {
+    return res.status(403).json({ error: 'User inactive' });
+  }
+
+  // 3. Success
+  res.json({
+    access_token: data.session.access_token,
+    role: appUser.role,
+    companies: [appUser.company_id]
+  });
 });
 
 export default router;
