@@ -1,15 +1,30 @@
 import express from 'express';
-import { supabase } from '../config/supabase.js';
+import { supabaseAdmin } from '../config/supabase.js';
 
 const router = express.Router();
 
 router.get('/', async (req, res) => {
-  const { data } = await supabase
-    .from('item_images')
-    .select('*')
-    .eq('company_id', req.companyId);
+  try {
+    // companyId must come from middleware (licenseGuard)
+    if (!req.companyId) {
+      return res.status(400).json({ error: 'Company not selected' });
+    }
 
-  res.json(data);
+    const { data, error } = await supabaseAdmin
+      .from('item_images')
+      .select('*')
+      .eq('company_id', req.companyId);
+
+    if (error) {
+      console.error('Images fetch error:', error);
+      return res.status(500).json({ error: 'Image fetch failed' });
+    }
+
+    return res.json(data ?? []);
+  } catch (err) {
+    console.error('Images route crash:', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
 });
 
 export default router;

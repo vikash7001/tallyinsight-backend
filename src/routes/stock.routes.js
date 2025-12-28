@@ -1,23 +1,38 @@
 import express from 'express';
-import { supabase } from '../config/supabase.js';
+import { supabaseAdmin } from '../config/supabase.js';
 import { log } from '../utils/logger.js';
 
 const router = express.Router();
 
 router.get('/', async (req, res) => {
-  const limit = Number(req.query.limit || 50);
-  const offset = Number(req.query.offset || 0);
+  try {
+    const limit = Number(req.query.limit || 50);
+    const offset = Number(req.query.offset || 0);
 
-  const { data, error } = await supabase
-    .from('v_active_stock')
-    .select('*')
-    .eq('company_id', req.companyId)
-    .range(offset, offset + limit - 1);
+    // 🔒 companyId must be present (from licenseGuard)
+    if (!req.companyId) {
+      return res.status(400).json({ error: 'Company not selected' });
+    }
 
-  await log(req.companyId, 'FETCH_STOCK');
+    const { data, error } = await supabaseAdmin
+      .from('v_active_stock')
+      .select('*')
+      .eq('company_id', req.companyId)
+      .range(offset, offset + limit - 1);
 
-  if (error) return res.status(500).json({ error: 'Stock fetch failed' });
-  res.json(data);
+    // log AFTER successful query attempt
+    await log(req.companyId, 'FETCH_STOCK');
+
+    if (error) {
+      console.error('Stock fetch error:', error);
+      return res.status(500).json({ error: 'Stock fetch failed' });
+    }
+
+    return res.json(data ?? []);
+  } catch (err) {
+    console.error('Stock route crash:', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
 });
 
 export default router;
