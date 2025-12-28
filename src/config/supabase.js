@@ -1,13 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
 
-console.log(
-  'SUPABASE KEY PREFIX:',
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-    ? process.env.SUPABASE_SERVICE_ROLE_KEY.slice(0, 12)
-    : 'MISSING'
+// 🔐 AUTH client (used only for sign-in)
+export const supabaseAuth = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_PUBLISHABLE_KEY
 );
 
-export const supabase = createClient(
+// 🛠 ADMIN client (used for DB queries)
+export const supabaseAdmin = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY,
   {

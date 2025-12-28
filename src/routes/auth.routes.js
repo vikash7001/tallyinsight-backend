@@ -1,5 +1,5 @@
 import express from 'express';
-import { supabase } from '../config/supabase.js';
+import { supabaseAuth, supabaseAdmin } from '../config/supabase.js';
 
 const router = express.Router();
 
@@ -9,7 +9,7 @@ router.post('/login', async (req, res) => {
 
     // 1️⃣ Authenticate user
     const { data: authData, error: authError } =
-      await supabase.auth.signInWithPassword({
+      await supabaseAuth.auth.signInWithPassword({
         email,
         password,
       });
@@ -20,24 +20,22 @@ router.post('/login', async (req, res) => {
 
     const userId = authData.user.id;
 
-    // 2️⃣ Fetch companies (CRITICAL FIX)
-    const { data: companyRows, error: companyError } =
-      await supabase
-        .from('admin_companies')
-        .select('company_id')
-        .eq('admin_id', userId);
+    // 2️⃣ FETCH COMPANIES USING ADMIN CLIENT (🔥 FIX)
+    const { data: rows, error } = await supabaseAdmin
+      .from('admin_companies')
+      .select('company_id')
+      .eq('admin_id', userId);
 
-    if (companyError) {
-      console.error('Company fetch error:', companyError);
+    if (error) {
+      console.error('Company query error:', error);
       return res.status(500).json({ error: 'Company lookup failed' });
     }
 
-    // 3️⃣ GUARDED mapping (NO crashes)
-    const companies = (companyRows ?? []).map(r => r.company_id);
+    const companies = (rows ?? []).map(r => r.company_id);
 
     return res.json({
       access_token: authData.session.access_token,
-      companies,
+      companies
     });
 
   } catch (err) {
