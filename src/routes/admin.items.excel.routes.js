@@ -8,10 +8,50 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 /* =========================
    GET /admin/items/excel
-   (already working)
 ========================= */
-// ⬆️ KEEP YOUR EXISTING GET CODE HERE UNCHANGED
+router.get('/items/excel', async (req, res) => {
+  try {
+    const companyId = req.company_id;
+    if (!companyId) {
+      return res.status(400).json({ error: 'Company not selected' });
+    }
 
+    const { data, error } = await supabaseAdmin
+      .from('items')
+      .select('item_code, item_name')
+      .eq('company_id', companyId)
+      .order('item_code');
+
+    if (error) {
+      return res.status(500).json({ error: 'DB error' });
+    }
+
+    const sheet = XLSX.utils.json_to_sheet(data ?? []);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, sheet, 'ITEMS');
+
+    const arr = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const buf = Buffer.from(arr);
+
+    console.log('XLSX BUFFER LENGTH:', buf.length);
+    console.log('XLSX FIRST BYTES:', buf.slice(0, 10));
+
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename="test.xlsx"'
+    );
+    res.setHeader('Content-Length', buf.length);
+
+    return res.end(buf);
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
 
 /* =========================
    POST /admin/items/excel
@@ -27,10 +67,8 @@ router.post('/items/excel', upload.single('file'), async (req, res) => {
       return res.status(400).json({ error: 'Excel file required' });
     }
 
-    // 1️⃣ Read workbook
     const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
 
-    // 2️⃣ Validate META sheet
     const metaSheet = workbook.Sheets['__META__'];
     if (!metaSheet) {
       return res.status(400).json({ error: 'Missing __META__ sheet' });
@@ -43,7 +81,6 @@ router.post('/items/excel', upload.single('file'), async (req, res) => {
       return res.status(400).json({ error: 'Company mismatch in Excel' });
     }
 
-    // 3️⃣ Read ITEM_IMAGES
     const itemSheet = workbook.Sheets['ITEM_IMAGES'];
     if (!itemSheet) {
       return res.status(400).json({ error: 'Missing ITEM_IMAGES sheet' });
@@ -55,7 +92,6 @@ router.post('/items/excel', upload.single('file'), async (req, res) => {
     let skipped = 0;
     const failed = [];
 
-    // 4️⃣ Process rows (PARTIAL SUCCESS)
     for (const row of rows) {
       const itemCode = row.item_code;
       const imageUrl = row.image_url;
@@ -83,7 +119,6 @@ router.post('/items/excel', upload.single('file'), async (req, res) => {
       }
     }
 
-    // 5️⃣ Summary response
     return res.json({
       total_rows: rows.length,
       updated,
