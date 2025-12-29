@@ -46,26 +46,22 @@ router.get('/items/excel', async (req, res) => {
     XLSX.utils.book_append_sheet(workbook, metaSheet, '__META__');
 
     // Hide meta sheet
-    workbook.Workbook = {
-      Sheets: [{ Hidden: 0 }, { Hidden: 1 }]
-    };
 
     // 5️⃣ Send file
-    const buffer = XLSX.write(workbook, {
-      type: 'buffer',
-      bookType: 'xlsx'
-    });
+   const buffer = XLSX.write(workbook, {
+  bookType: 'xlsx',
+  type: 'buffer'
+});
 
-    res.setHeader(
-      'Content-Disposition',
-      'attachment; filename="item_images.xlsx"'
-    );
-    res.setHeader(
-      'Content-Type',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    );
+res.status(200);
+res.set({
+  'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'Content-Disposition': 'attachment; filename="item_images.xlsx"',
+  'Content-Length': buffer.length
+});
 
-    res.send(buffer);
+return res.end(buffer);
+
   } catch (err) {
     console.error('Excel download error', err);
     res.status(500).json({ error: 'Server error' });
