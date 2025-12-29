@@ -6,15 +6,11 @@ import authRoutes from './routes/auth.routes.js';
 import stockRoutes from './routes/stock.routes.js';
 import imageRoutes from './routes/image.routes.js';
 
-// existing middleware
 import { requireAuth } from './middleware/auth.js';
 import { licenseGuard } from './middleware/licenseGuard.js';
 
 // NEW admin header middleware
 import adminHeaderAuth from './middleware/adminHeaderAuth.js';
-
-// (admin routes will be added later)
-import adminItemsExcelRoutes from './routes/admin.items.excel.routes.js'; // placeholder for next step
 
 const app = express();
 
@@ -26,16 +22,13 @@ app.get('/health', (req, res) => {
   res.json({ ok: true });
 });
 
-// 🔓 Public / existing routes (UNCHANGED)
+// 🔓 Existing routes — UNCHANGED
 app.use('/auth', authRoutes);
 app.use('/stock', requireAuth, licenseGuard, stockRoutes);
 app.use('/images', requireAuth, licenseGuard, imageRoutes);
 app.use('/items', requireAuth, licenseGuard, itemsRoutes);
 
-// 🔐 ADMIN SCOPE (NEW, ISOLATED)
+// 🔐 Admin scope — middleware only (NO routes yet)
 app.use('/admin', adminHeaderAuth);
-
-// admin routes will live here (Excel download/upload)
-app.use('/admin', adminItemsExcelRoutes); // safe even if empty for now
 
 export default app;
