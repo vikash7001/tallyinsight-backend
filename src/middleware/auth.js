@@ -9,18 +9,16 @@ export const requireAuth = async (req, res, next) => {
   }
 
   const { data, error } = await supabaseAdmin
-    .from('app_users')
-    .select('user_id, company_id, active')
-    .eq('user_id', user_id)
-    .eq('company_id', company_id)
-    .single();
+    .rpc('check_app_user', {
+      p_user_id: user_id,
+      p_company_id: company_id
+    });
 
-  if (error || !data || !data.active) {
+  if (error || !data) {
     return res.status(403).json({ error: 'User not allowed' });
   }
 
-  req.user_id = data.user_id;
-  req.company_id = data.company_id;
-
+  req.user_id = user_id;
+  req.company_id = company_id;
   next();
 };
