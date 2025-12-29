@@ -1,28 +1,28 @@
-import express from 'express';
-import { supabaseAdmin } from '../config/supabase.js';
-
-const router = express.Router();
-
-router.get('/', async (req, res) => {
+router.put('/:item_code', async (req, res) => {
   try {
     if (!req.company_id) {
       return res.status(400).json({ error: 'Company not selected' });
     }
 
-    const { data, error } = await supabaseAdmin
+    const { item_code } = req.params;
+    const { image_url } = req.body;
+
+    if (!image_url) {
+      return res.status(400).json({ error: 'image_url required' });
+    }
+
+    const { error } = await supabaseAdmin
       .from('items')
-      .select('item_code, item_name, image_url')
+      .update({ image_url })
       .eq('company_id', req.company_id)
-      .order('item_code');
+      .eq('item_code', item_code);
 
-  if (error) {
-  return res.status(500).json({ supabaseError: error });
-}
+    if (error) {
+      return res.status(500).json({ error: 'Failed to update image' });
+    }
 
-    return res.json(data ?? []);
+    return res.json({ ok: true });
   } catch (err) {
     return res.status(500).json({ error: 'Server error' });
   }
 });
-
-export default router;
