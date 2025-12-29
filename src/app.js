@@ -8,6 +8,7 @@ import imageRoutes from './routes/image.routes.js';
 
 import { requireAuth } from './middleware/auth.js';
 import { licenseGuard } from './middleware/licenseGuard.js';
+import adminItemsExcelRoutes from './routes/admin.items.excel.routes.js';
 
 // NEW admin header middleware
 import adminHeaderAuth from './middleware/adminHeaderAuth.js';
@@ -27,6 +28,7 @@ app.use('/auth', authRoutes);
 app.use('/stock', requireAuth, licenseGuard, stockRoutes);
 app.use('/images', requireAuth, licenseGuard, imageRoutes);
 app.use('/items', requireAuth, licenseGuard, itemsRoutes);
+app.use('/admin', adminItemsExcelRoutes);
 
 // 🔐 Admin scope — middleware only (NO routes yet)
 app.use('/admin', adminHeaderAuth);
