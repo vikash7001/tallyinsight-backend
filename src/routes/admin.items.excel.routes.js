@@ -18,7 +18,7 @@ router.get('/items/excel', async (req, res) => {
 
     const { data, error } = await supabaseAdmin
       .from('items')
-      .select('item_code, item_name')
+      .select('item_code, item_name, image_url')
       .eq('company_id', companyId)
       .order('item_code');
 
@@ -26,12 +26,11 @@ router.get('/items/excel', async (req, res) => {
       return res.status(500).json({ error: 'DB error' });
     }
 
-    // FINAL expected sheet
     const sheet = XLSX.utils.json_to_sheet(
       (data ?? []).map(r => ({
         item_code: r.item_code,
         item_name: r.item_name,
-        image_url: ''   // 👈 COLUMN C for user input
+        image_url: r.image_url || ''   // 👈 EXISTING URL SHOWN
       }))
     );
 
@@ -57,6 +56,7 @@ router.get('/items/excel', async (req, res) => {
     return res.status(500).json({ error: 'Server error' });
   }
 });
+
 
 
 /* =========================
