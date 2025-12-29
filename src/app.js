@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import itemsRoutes from './routes/items.routes.js';
 
 import authRoutes from './routes/auth.routes.js';
 import stockRoutes from './routes/stock.routes.js';
@@ -22,5 +23,6 @@ app.get('/health', (req, res) => {
 app.use('/auth', authRoutes);
 app.use('/stock', requireAuth, licenseGuard, stockRoutes);
 app.use('/images', requireAuth, licenseGuard, imageRoutes);
+app.use('/items', requireAuth, licenseGuard, itemsRoutes);
 
 export default app;
