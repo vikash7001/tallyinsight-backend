@@ -26,15 +26,20 @@ router.get('/items/excel', async (req, res) => {
       return res.status(500).json({ error: 'DB error' });
     }
 
-    const sheet = XLSX.utils.json_to_sheet(data ?? []);
+    // FINAL expected sheet
+    const sheet = XLSX.utils.json_to_sheet(
+      (data ?? []).map(r => ({
+        item_code: r.item_code,
+        item_name: r.item_name,
+        image_url: ''   // 👈 COLUMN C for user input
+      }))
+    );
+
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, sheet, 'ITEMS');
+    XLSX.utils.book_append_sheet(wb, sheet, 'ITEM_IMAGES');
 
     const arr = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
     const buf = Buffer.from(arr);
-
-    console.log('XLSX BUFFER LENGTH:', buf.length);
-    console.log('XLSX FIRST BYTES:', buf.slice(0, 10));
 
     res.setHeader(
       'Content-Type',
@@ -42,7 +47,7 @@ router.get('/items/excel', async (req, res) => {
     );
     res.setHeader(
       'Content-Disposition',
-      'attachment; filename="test.xlsx"'
+      'attachment; filename="item_images.xlsx"'
     );
     res.setHeader('Content-Length', buf.length);
 
@@ -52,6 +57,7 @@ router.get('/items/excel', async (req, res) => {
     return res.status(500).json({ error: 'Server error' });
   }
 });
+
 
 /* =========================
    POST /admin/items/excel
