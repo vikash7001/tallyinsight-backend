@@ -1,35 +1,26 @@
-import { supabase } from '../config/supabase.js';
+import { supabaseAdmin } from '../config/supabase.js';
 
 export const requireUser = async (req, res, next) => {
-  const authHeader = req.headers.authorization;
+  const company_id = req.headers.company_id;
+  const user_id = req.headers.user_id;
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Missing token' });
+  if (!company_id || !user_id) {
+    return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  const token = authHeader.replace('Bearer ', '');
-
-  const { data, error } = await supabase.auth.getUser(token);
-
-  if (error || !data?.user) {
-    return res.status(401).json({ error: 'Invalid token' });
-  }
-
-  const supabase_user_id = data.user.id;
-
-  // map Supabase auth user → app_users
-  const { data: appUser, error: userError } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('app_users')
     .select('user_id, company_id, active')
-    .eq('user_id', supabase_user_id)
+    .eq('user_id', user_id)
+    .eq('company_id', company_id)
     .single();
 
-  if (userError || !appUser || !appUser.active) {
-    return res.status(403).json({ error: 'User not registered or inactive' });
+  if (error || !data || !data.active) {
+    return res.status(403).json({ error: 'User not allowed' });
   }
 
-  req.user_id = appUser.user_id;
-  req.company_id = appUser.company_id;
+  req.user_id = data.user_id;
+  req.company_id = data.company_id;
 
   next();
 };
