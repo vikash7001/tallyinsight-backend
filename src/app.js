@@ -28,9 +28,9 @@ app.use('/auth', authRoutes);
 app.use('/stock', requireAuth, licenseGuard, stockRoutes);
 app.use('/images', requireAuth, licenseGuard, imageRoutes);
 app.use('/items', requireAuth, licenseGuard, itemsRoutes);
-app.use('/admin', adminItemsExcelRoutes);
 
 // 🔐 Admin scope — middleware only (NO routes yet)
 app.use('/admin', adminHeaderAuth);
+app.use('/admin', adminItemsExcelRoutes);
 
 export default app;
