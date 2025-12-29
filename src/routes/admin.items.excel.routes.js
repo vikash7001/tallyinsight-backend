@@ -1,70 +1,98 @@
 import express from 'express';
 import XLSX from 'xlsx';
-import { v4 as uuidv4 } from 'uuid';
+import multer from 'multer';
 import { supabaseAdmin } from '../config/supabase.js';
 
 const router = express.Router();
+const upload = multer({ storage: multer.memoryStorage() });
 
-router.get('/items/excel', async (req, res) => {
+/* =========================
+   GET /admin/items/excel
+   (already working)
+========================= */
+// ⬆️ KEEP YOUR EXISTING GET CODE HERE UNCHANGED
+
+
+/* =========================
+   POST /admin/items/excel
+========================= */
+router.post('/items/excel', upload.single('file'), async (req, res) => {
   try {
     const companyId = req.company_id;
     if (!companyId) {
       return res.status(400).json({ error: 'Company not selected' });
     }
 
-    // 1️⃣ Fetch items (same logic as /items)
-    const { data, error } = await supabaseAdmin
-      .from('items')
-      .select('item_code, item_name, image_url')
-      .eq('company_id', companyId)
-      .order('item_code');
-
-    if (error) {
-      return res.status(500).json({ error: 'Failed to fetch items' });
+    if (!req.file) {
+      return res.status(400).json({ error: 'Excel file required' });
     }
 
-    // 2️⃣ ITEM_IMAGES sheet
-    const itemsSheet = XLSX.utils.json_to_sheet(
-      (data ?? []).map(i => ({
-        item_code: i.item_code,
-        item_name: i.item_name,
-        image_url: ''
-      }))
-    );
+    // 1️⃣ Read workbook
+    const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
 
-    // 3️⃣ META sheet (hidden)
-    const downloadId = uuidv4();
-    const metaSheet = XLSX.utils.aoa_to_sheet([
-      ['download_id', downloadId],
-      ['company_id', companyId],
-      ['downloaded_at', new Date().toISOString()]
-    ]);
+    // 2️⃣ Validate META sheet
+    const metaSheet = workbook.Sheets['__META__'];
+    if (!metaSheet) {
+      return res.status(400).json({ error: 'Missing __META__ sheet' });
+    }
 
-    // 4️⃣ Build workbook
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, itemsSheet, 'ITEM_IMAGES');
-    XLSX.utils.book_append_sheet(workbook, metaSheet, '__META__');
+    const meta = XLSX.utils.sheet_to_json(metaSheet, { header: 1 });
+    const metaMap = Object.fromEntries(meta);
 
-    // Hide meta sheet
+    if (metaMap.company_id !== companyId) {
+      return res.status(400).json({ error: 'Company mismatch in Excel' });
+    }
 
-    // 5️⃣ Send file
-   const buffer = XLSX.write(workbook, {
-  bookType: 'xlsx',
-  type: 'buffer'
-});
+    // 3️⃣ Read ITEM_IMAGES
+    const itemSheet = workbook.Sheets['ITEM_IMAGES'];
+    if (!itemSheet) {
+      return res.status(400).json({ error: 'Missing ITEM_IMAGES sheet' });
+    }
 
-res.status(200);
-res.set({
-  'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'Content-Disposition': 'attachment; filename="item_images.xlsx"',
-  'Content-Length': buffer.length
-});
+    const rows = XLSX.utils.sheet_to_json(itemSheet);
 
-return res.end(buffer);
+    let updated = 0;
+    let skipped = 0;
+    const failed = [];
 
+    // 4️⃣ Process rows (PARTIAL SUCCESS)
+    for (const row of rows) {
+      const itemCode = row.item_code;
+      const imageUrl = row.image_url;
+
+      if (!itemCode || !imageUrl) {
+        skipped++;
+        continue;
+      }
+
+      if (!/^https:\/\/.+/i.test(imageUrl)) {
+        failed.push({ item_code: itemCode, reason: 'Invalid URL' });
+        continue;
+      }
+
+      const { error } = await supabaseAdmin
+        .from('items')
+        .update({ image_url: imageUrl })
+        .eq('company_id', companyId)
+        .eq('item_code', itemCode);
+
+      if (error) {
+        failed.push({ item_code: itemCode, reason: 'Update failed' });
+      } else {
+        updated++;
+      }
+    }
+
+    // 5️⃣ Summary response
+    return res.json({
+      total_rows: rows.length,
+      updated,
+      skipped,
+      failed
+    });
   } catch (err) {
-    console.error('Excel download error', err);
-    res.status(500).json({ error: 'Server error' });
+    console.error('Excel upload error', err);
+    return res.status(500).json({ error: 'Server error' });
   }
 });
 
