@@ -1,30 +1,14 @@
-import { supabaseAdmin } from '../config/supabase.js';
+import express from 'express';
 
-export const requireAuth = async (req, res, next) => {
-  const rawCompanyId = req.headers['x-company-id'];
-  const rawUserId = req.headers['x-user-id'];
+const router = express.Router();
 
-  // sanitize (ReqBin quirk)
-  const company_id = rawCompanyId?.replace(/^:\s*/, '');
-  const user_id = rawUserId?.replace(/^:\s*/, '');
+/*
+  Auth routes are intentionally minimal for now.
+  Header-based auth is handled in middleware/auth.js
+*/
 
-  if (!company_id || !user_id) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
+router.post('/login', (req, res) => {
+  return res.status(501).json({ error: 'Login not implemented' });
+});
 
-  const { data, error } = await supabaseAdmin
-    .from('app_users')
-    .select('user_id, company_id, active')
-    .eq('user_id', user_id)
-    .eq('company_id', company_id)
-    .single();
-
-  if (error || !data || !data.active) {
-    return res.status(403).json({ error: 'User not allowed' });
-  }
-
-  req.user_id = data.user_id;
-  req.company_id = data.company_id;
-
-  next();
-};
+export default router;
