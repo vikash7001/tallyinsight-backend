@@ -1,6 +1,6 @@
 import { supabaseAdmin } from '../config/supabase.js';
 
-export const requireUser = async (req, res, next) => {
+export const requireAuth = async (req, res, next) => {
   const company_id = req.headers.company_id;
   const user_id = req.headers.user_id;
 
