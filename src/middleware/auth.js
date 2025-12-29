@@ -1,8 +1,9 @@
 import { supabaseAdmin } from '../config/supabase.js';
+console.log(req.headers);
 
 export const requireAuth = async (req, res, next) => {
-  const company_id = req.headers.company_id;
-  const user_id = req.headers.user_id;
+  const company_id = req.headers['x-company-id'];
+  const user_id = req.headers['x-user-id'];
 
   if (!company_id || !user_id) {
     return res.status(401).json({ error: 'Unauthorized' });
