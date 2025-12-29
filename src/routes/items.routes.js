@@ -15,9 +15,9 @@ router.get('/', async (req, res) => {
       .eq('company_id', req.company_id)
       .order('item_code');
 
-    if (error) {
-      return res.status(500).json({ error: 'Failed to fetch items' });
-    }
+  if (error) {
+  return res.status(500).json({ supabaseError: error });
+}
 
     return res.json(data ?? []);
   } catch (err) {
