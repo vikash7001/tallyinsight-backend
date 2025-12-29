@@ -1,38 +1,30 @@
-import express from 'express';
 import { supabaseAdmin } from '../config/supabase.js';
 
-const router = express.Router();
+export const requireAuth = async (req, res, next) => {
+  const rawCompanyId = req.headers['x-company-id'];
+  const rawUserId = req.headers['x-user-id'];
 
-router.post('/login', async (req, res) => {
-  const { email, password } = req.body;
+  // sanitize (ReqBin quirk)
+  const company_id = rawCompanyId?.replace(/^:\s*/, '');
+  const user_id = rawUserId?.replace(/^:\s*/, '');
 
-  // 1. Authenticate
-  const { data, error } = await supabaseAdmin.auth.signInWithPassword({
-    email,
-    password
-  });
-
-  if (error || !data.user) {
-    return res.status(401).json({ error: 'Invalid credentials' });
+  if (!company_id || !user_id) {
+    return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  const adminId = data.user.id;
+  const { data, error } = await supabaseAdmin
+    .from('app_users')
+    .select('user_id, company_id, active')
+    .eq('user_id', user_id)
+    .eq('company_id', company_id)
+    .single();
 
-  // 2. Fetch company from admin_companies
-  const { data: rows, error: compErr } = await supabaseAdmin
-    .from('admin_companies')
-    .select('company_id')
-    .eq('admin_id', adminId);
-
-  if (compErr || !rows || rows.length === 0) {
-    return res.status(403).json({ error: 'No company assigned' });
+  if (error || !data || !data.active) {
+    return res.status(403).json({ error: 'User not allowed' });
   }
 
-  // 3. Success
-  res.json({
-    access_token: data.session.access_token,
-    companies: rows.map(r => r.company_id)
-  });
-});
+  req.user_id = data.user_id;
+  req.company_id = data.company_id;
 
-export default router;
+  next();
+};
