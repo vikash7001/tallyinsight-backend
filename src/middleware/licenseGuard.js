@@ -2,20 +2,21 @@ import { supabaseAdmin } from '../config/supabase.js';
 
 export async function licenseGuard(req, res, next) {
   try {
-    const companyId = req.headers['x-company-id'];
+    // Sanitize header (ReqBin adds ": ")
+    const rawCompanyId = req.headers['x-company-id'];
+    const company_id = rawCompanyId?.replace(/^:\s*/, '');
 
-    if (!companyId) {
+    if (!company_id) {
       return res.status(400).json({ error: 'Company not selected' });
     }
 
     const { data, error } = await supabaseAdmin
-      .from('v_company_license_status')
+      .from('subscriptions')
       .select('status')
-      .eq('company_id', companyId)
+      .eq('company_id', company_id)
       .single();
 
     if (error || !data) {
-      console.error('License lookup failed:', error);
       return res.status(403).json({ error: 'License not found' });
     }
 
@@ -23,8 +24,8 @@ export async function licenseGuard(req, res, next) {
       return res.status(403).json({ error: 'License expired' });
     }
 
-    // Attach context
-    req.companyId = Number(companyId);
+    // Attach context (KEEP UUID AS STRING)
+    req.company_id = company_id;
     req.licenseStatus = data.status;
 
     next();
