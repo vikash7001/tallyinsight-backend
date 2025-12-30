@@ -92,10 +92,14 @@ router.post('/stock', async (req, res) => {
         item_name: i.item_code   // placeholder; Tally is truth
       }));
 
-      await supabaseAdmin
-        .from('items')
-        .insert(newItems);
-    }
+    const { data: createdItems, error: createErr } = await supabaseAdmin
+  .from('items')
+  .insert(newItems)
+  .select('item_id, item_code');
+
+if (createErr) {
+  return res.status(500).json({ error: 'Item auto-create failed' });
+}
 
     /* =========================
        5️⃣ Re-fetch all item_ids
@@ -109,6 +113,8 @@ router.post('/stock', async (req, res) => {
     const itemMap = Object.fromEntries(
       (allItems ?? []).map(i => [i.item_code, i.item_id])
     );
+
+
 
     /* =========================
        6️⃣ Build snapshot rows
