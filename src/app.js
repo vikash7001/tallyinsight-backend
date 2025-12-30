@@ -12,6 +12,7 @@ import adminItemsExcelRoutes from './routes/admin.items.excel.routes.js';
 
 // NEW admin header middleware
 import adminHeaderAuth from './middleware/adminHeaderAuth.js';
+import tdlStockRoutes from './routes/tdl.stock.routes.js';
 
 const app = express();
 
@@ -32,5 +33,7 @@ app.use('/items', requireAuth, licenseGuard, itemsRoutes);
 // 🔐 Admin scope — middleware only (NO routes yet)
 app.use('/admin', adminHeaderAuth);
 app.use('/admin', adminItemsExcelRoutes);
+// 🔐 TDL routes (no user auth)
+app.use('/tdl', tdlStockRoutes);
 
 export default app;
