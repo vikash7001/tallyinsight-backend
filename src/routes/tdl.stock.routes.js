@@ -91,13 +91,11 @@ const { data, error } = await supabaseAdmin
   })
   .select('item_id, item_code');
 
+if (error) {
+  return res.status(500).json({ error: 'Item auto-create failed' });
+}
 
-      if (error) {
-        return res.status(500).json({ error: 'Item auto-create failed' });
-      }
-
-      createdItems = data ?? [];
-    }
+createdItems = data ?? [];
 
     /* =========================
        5️⃣ Build item map (NO re-fetch)
