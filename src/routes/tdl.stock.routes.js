@@ -58,14 +58,14 @@ router.post('/stock', async (req, res) => {
        3️⃣ Build snapshot rows
        (batch ignored, unit metadata only)
     ========================= */
-    const rows = items
-      .filter(i => itemMap[i.item_code])
-      .map(i => ({
-        snapshot_id: snapshot.snapshot_id,
-        item_id: itemMap[i.item_code],
-        stock_qty: Number(i.stock_qty) || 0,
-        unit: i.unit || null   // optional metadata
-      }));
+const rows = items
+  .filter(i => itemMap[i.item_code])
+  .map(i => ({
+    snapshot_id: snapshot.snapshot_id,
+    item_id: itemMap[i.item_code],
+    stock_qty: Number(i.stock_qty) || 0
+  }));
+
 
     if (rows.length === 0) {
       return res.status(400).json({ error: 'No valid items found' });
