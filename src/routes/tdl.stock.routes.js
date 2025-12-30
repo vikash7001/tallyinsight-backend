@@ -89,9 +89,13 @@ router.post('/stock', async (req, res) => {
         })
         .select('item_id, item_code');
 
-      if (error) {
-        return res.status(500).json({ error: 'Item auto-create failed' });
-      }
+if (error) {
+  console.error('UPSERT ERROR:', error);
+  return res.status(500).json({
+    error: 'Item auto-create failed',
+    details: error.message
+  });
+}
 
       createdItems = data ?? [];
     }
