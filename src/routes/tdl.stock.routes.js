@@ -6,10 +6,9 @@ const router = express.Router();
 
 /**
  * POST /tdl/stock
- * Called directly from TDL
  * - Tally is the only source of truth
  * - Missing items are auto-created (minimal shell)
- * - Stock snapshot is always created
+ * - Snapshot is created ONLY after items are ready
  */
 router.post('/stock', async (req, res) => {
   try {
@@ -54,9 +53,8 @@ router.post('/stock', async (req, res) => {
       }))
       .filter(i => i.item_code);
 
-
     /* =========================
-       3️⃣ Fetch existing items
+       2️⃣ Fetch existing items
     ========================= */
     const itemCodes = items.map(i => i.item_code);
 
@@ -69,7 +67,7 @@ router.post('/stock', async (req, res) => {
     const existingCodes = new Set((dbItems ?? []).map(i => i.item_code));
 
     /* =========================
-       4️⃣ Auto-create missing items
+       3️⃣ Auto-create missing items (UPSERT)
     ========================= */
     const missingItems = items.filter(
       i => !existingCodes.has(i.item_code)
@@ -81,24 +79,25 @@ router.post('/stock', async (req, res) => {
       const newItems = missingItems.map(i => ({
         company_id: companyId,
         item_code: i.item_code,
-        item_name: i.item_code   // placeholder only
+        item_name: i.item_code
       }));
 
-const { data, error } = await supabaseAdmin
-  .from('items')
-  .upsert(newItems, {
-    onConflict: 'company_id,item_code'
-  })
-  .select('item_id, item_code');
+      const { data, error } = await supabaseAdmin
+        .from('items')
+        .upsert(newItems, {
+          onConflict: 'company_id,item_code'
+        })
+        .select('item_id, item_code');
 
-if (error) {
-  return res.status(500).json({ error: 'Item auto-create failed' });
-}
+      if (error) {
+        return res.status(500).json({ error: 'Item auto-create failed' });
+      }
 
-createdItems = data ?? [];
+      createdItems = data ?? [];
+    }
 
     /* =========================
-       5️⃣ Build item map (NO re-fetch)
+       4️⃣ Build item map (NO re-fetch)
     ========================= */
     const allItemRows = [
       ...(dbItems ?? []),
@@ -108,8 +107,9 @@ createdItems = data ?? [];
     const itemMap = Object.fromEntries(
       allItemRows.map(i => [i.item_code, i.item_id])
     );
+
     /* =========================
-       2️⃣ Create stock snapshot
+       5️⃣ Create stock snapshot (SAFE POSITION)
     ========================= */
     const { data: snapshot, error: snapErr } = await supabaseAdmin
       .from('stock_snapshots')
