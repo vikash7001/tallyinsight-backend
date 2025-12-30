@@ -96,10 +96,13 @@ router.post('/stock', async (req, res) => {
         item_name: i.item_code   // placeholder only
       }));
 
-      const { data, error } = await supabaseAdmin
-        .from('items')
-        .insert(newItems)
-        .select('item_id, item_code');
+const { data, error } = await supabaseAdmin
+  .from('items')
+  .upsert(newItems, {
+    onConflict: 'company_id,item_code'
+  })
+  .select('item_id, item_code');
+
 
       if (error) {
         return res.status(500).json({ error: 'Item auto-create failed' });
