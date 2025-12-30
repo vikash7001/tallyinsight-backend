@@ -8,6 +8,7 @@ const router = express.Router();
  * POST /tdl/stock
  * - Tally is the only source of truth
  * - Missing items are auto-created (minimal shell)
+ * - UOM always comes from TDL
  * - Snapshot is created ONLY after items are ready
  */
 router.post('/stock', async (req, res) => {
@@ -49,9 +50,14 @@ router.post('/stock', async (req, res) => {
     const items = req.body.items
       .map(i => ({
         ...i,
-        item_code: String(i.item_code || '').trim()
+        item_code: String(i.item_code || '').trim(),
+        uom: String(i.uom || '').trim()
       }))
-      .filter(i => i.item_code);
+      .filter(i => i.item_code && i.uom);
+
+    if (items.length === 0) {
+      return res.status(400).json({ error: 'Valid item_code and uom required' });
+    }
 
     /* =========================
        2️⃣ Fetch existing items
@@ -79,7 +85,8 @@ router.post('/stock', async (req, res) => {
       const newItems = missingItems.map(i => ({
         company_id: companyId,
         item_code: i.item_code,
-        item_name: i.item_code
+        item_name: i.item_code, // placeholder only
+        uom: i.uom              // 🔴 REQUIRED (from TDL)
       }));
 
       const { data, error } = await supabaseAdmin
@@ -89,13 +96,13 @@ router.post('/stock', async (req, res) => {
         })
         .select('item_id, item_code');
 
-if (error) {
-  console.error('UPSERT ERROR:', error);
-  return res.status(500).json({
-    error: 'Item auto-create failed',
-    details: error.message
-  });
-}
+      if (error) {
+        console.error('UPSERT ERROR:', error);
+        return res.status(500).json({
+          error: 'Item auto-create failed',
+          details: error.message
+        });
+      }
 
       createdItems = data ?? [];
     }
