@@ -7,6 +7,9 @@ const router = express.Router();
 /**
  * POST /tdl/stock
  * Called directly from TDL
+ * - Tally is the only source of truth
+ * - Missing items are auto-created (minimal shell)
+ * - Stock snapshot is always created
  */
 router.post('/stock', async (req, res) => {
   try {
@@ -60,9 +63,11 @@ router.post('/stock', async (req, res) => {
     }
 
     /* =========================
-       3️⃣ Resolve item_code → item_id
+       3️⃣ Fetch existing items
     ========================= */
-    const itemCodes = items.map(i => i.item_code);
+    const itemCodes = items
+      .map(i => i.item_code)
+      .filter(Boolean);
 
     const { data: dbItems } = await supabaseAdmin
       .from('items')
@@ -70,12 +75,43 @@ router.post('/stock', async (req, res) => {
       .eq('company_id', companyId)
       .in('item_code', itemCodes);
 
+    const existingCodes = new Set((dbItems ?? []).map(i => i.item_code));
+
+    /* =========================
+       4️⃣ Auto-create missing items
+       (minimal shell, no validation)
+    ========================= */
+    const missingItems = items.filter(
+      i => i.item_code && !existingCodes.has(i.item_code)
+    );
+
+    if (missingItems.length > 0) {
+      const newItems = missingItems.map(i => ({
+        company_id: companyId,
+        item_code: i.item_code,
+        item_name: i.item_code   // placeholder; Tally is truth
+      }));
+
+      await supabaseAdmin
+        .from('items')
+        .insert(newItems);
+    }
+
+    /* =========================
+       5️⃣ Re-fetch all item_ids
+    ========================= */
+    const { data: allItems } = await supabaseAdmin
+      .from('items')
+      .select('item_id, item_code')
+      .eq('company_id', companyId)
+      .in('item_code', itemCodes);
+
     const itemMap = Object.fromEntries(
-      (dbItems ?? []).map(i => [i.item_code, i.item_id])
+      (allItems ?? []).map(i => [i.item_code, i.item_id])
     );
 
     /* =========================
-       4️⃣ Build snapshot rows
+       6️⃣ Build snapshot rows
        (batch ignored, unit ignored)
     ========================= */
     const rows = items
@@ -91,7 +127,7 @@ router.post('/stock', async (req, res) => {
     }
 
     /* =========================
-       5️⃣ Insert snapshot items
+       7️⃣ Insert snapshot items
     ========================= */
     const { error: rowErr } = await supabaseAdmin
       .from('stock_snapshot_items')
@@ -104,14 +140,14 @@ router.post('/stock', async (req, res) => {
     await log(companyId, 'TDL_STOCK_UPLOAD');
 
     /* =========================
-       6️⃣ Success response
+       8️⃣ Success response
     ========================= */
     return res.json({
       ok: true,
       snapshot_id: snapshot.snapshot_id,
       received: items.length,
       inserted: rows.length,
-      skipped: items.length - rows.length
+      auto_created_items: missingItems.length
     });
 
   } catch (err) {
