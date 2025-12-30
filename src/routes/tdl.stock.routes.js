@@ -41,13 +41,18 @@ router.post('/stock', async (req, res) => {
     }
 
     /* =========================
-       1️⃣ Validate payload
+       1️⃣ Validate & normalize payload
     ========================= */
-    const { items } = req.body;
-
-    if (!Array.isArray(items) || items.length === 0) {
+    if (!Array.isArray(req.body.items) || req.body.items.length === 0) {
       return res.status(400).json({ error: 'Items array required' });
     }
+
+    const items = req.body.items
+      .map(i => ({
+        ...i,
+        item_code: String(i.item_code || '').trim()
+      }))
+      .filter(i => i.item_code);
 
     /* =========================
        2️⃣ Create stock snapshot
@@ -65,9 +70,7 @@ router.post('/stock', async (req, res) => {
     /* =========================
        3️⃣ Fetch existing items
     ========================= */
-    const itemCodes = items
-      .map(i => i.item_code)
-      .filter(Boolean);
+    const itemCodes = items.map(i => i.item_code);
 
     const { data: dbItems } = await supabaseAdmin
       .from('items')
@@ -79,58 +82,52 @@ router.post('/stock', async (req, res) => {
 
     /* =========================
        4️⃣ Auto-create missing items
-       (minimal shell, no validation)
     ========================= */
     const missingItems = items.filter(
-      i => i.item_code && !existingCodes.has(i.item_code)
+      i => !existingCodes.has(i.item_code)
     );
+
+    let createdItems = [];
 
     if (missingItems.length > 0) {
       const newItems = missingItems.map(i => ({
         company_id: companyId,
         item_code: i.item_code,
-        item_name: i.item_code   // placeholder; Tally is truth
+        item_name: i.item_code   // placeholder only
       }));
 
-    const { data: createdItems, error: createErr } = await supabaseAdmin
-  .from('items')
-  .insert(newItems)
-  .select('item_id, item_code');
+      const { data, error } = await supabaseAdmin
+        .from('items')
+        .insert(newItems)
+        .select('item_id, item_code');
 
-if (createErr) {
-  return res.status(500).json({ error: 'Item auto-create failed' });
-}
+      if (error) {
+        return res.status(500).json({ error: 'Item auto-create failed' });
+      }
+
+      createdItems = data ?? [];
+    }
 
     /* =========================
-       5️⃣ Re-fetch all item_ids
+       5️⃣ Build item map (NO re-fetch)
     ========================= */
-    const { data: allItems } = await supabaseAdmin
-      .from('items')
-      .select('item_id, item_code')
-      .eq('company_id', companyId)
-      .in('item_code', itemCodes);
+    const allItemRows = [
+      ...(dbItems ?? []),
+      ...createdItems
+    ];
 
     const itemMap = Object.fromEntries(
-      (allItems ?? []).map(i => [i.item_code, i.item_id])
+      allItemRows.map(i => [i.item_code, i.item_id])
     );
-
-
 
     /* =========================
        6️⃣ Build snapshot rows
-       (batch ignored, unit ignored)
     ========================= */
-    const rows = items
-      .filter(i => itemMap[i.item_code])
-      .map(i => ({
-        snapshot_id: snapshot.snapshot_id,
-        item_id: itemMap[i.item_code],
-        stock_qty: Number(i.stock_qty) || 0
-      }));
-
-    if (rows.length === 0) {
-      return res.status(400).json({ error: 'No valid items found' });
-    }
+    const rows = items.map(i => ({
+      snapshot_id: snapshot.snapshot_id,
+      item_id: itemMap[i.item_code],
+      stock_qty: Number(i.stock_qty) || 0
+    }));
 
     /* =========================
        7️⃣ Insert snapshot items
@@ -153,7 +150,7 @@ if (createErr) {
       snapshot_id: snapshot.snapshot_id,
       received: items.length,
       inserted: rows.length,
-      auto_created_items: missingItems.length
+      auto_created_items: createdItems.length
     });
 
   } catch (err) {
