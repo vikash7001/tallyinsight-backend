@@ -54,18 +54,6 @@ router.post('/stock', async (req, res) => {
       }))
       .filter(i => i.item_code);
 
-    /* =========================
-       2️⃣ Create stock snapshot
-    ========================= */
-    const { data: snapshot, error: snapErr } = await supabaseAdmin
-      .from('stock_snapshots')
-      .insert({ company_id: companyId })
-      .select('snapshot_id')
-      .single();
-
-    if (snapErr) {
-      return res.status(500).json({ error: 'Snapshot create failed' });
-    }
 
     /* =========================
        3️⃣ Fetch existing items
@@ -122,6 +110,18 @@ const { data, error } = await supabaseAdmin
     const itemMap = Object.fromEntries(
       allItemRows.map(i => [i.item_code, i.item_id])
     );
+    /* =========================
+       2️⃣ Create stock snapshot
+    ========================= */
+    const { data: snapshot, error: snapErr } = await supabaseAdmin
+      .from('stock_snapshots')
+      .insert({ company_id: companyId })
+      .select('snapshot_id')
+      .single();
+
+    if (snapErr) {
+      return res.status(500).json({ error: 'Snapshot create failed' });
+    }
 
     /* =========================
        6️⃣ Build snapshot rows
