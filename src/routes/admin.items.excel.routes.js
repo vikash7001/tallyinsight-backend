@@ -2,6 +2,7 @@ import express from 'express';
 import XLSX from 'xlsx';
 import multer from 'multer';
 import { supabaseAdmin } from '../config/supabase.js';
+import { pullStockFromTally, parseStockItems } from '../services/tally.js';
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -30,7 +31,7 @@ router.get('/items/excel', async (req, res) => {
       (data ?? []).map(r => ({
         item_code: r.item_code,
         item_name: r.item_name,
-        image_url: r.image_url || ''   // 👈 EXISTING URL SHOWN
+        image_url: r.image_url || ''
       }))
     );
 
@@ -56,8 +57,6 @@ router.get('/items/excel', async (req, res) => {
     return res.status(500).json({ error: 'Server error' });
   }
 });
-
-
 
 /* =========================
    POST /admin/items/excel
@@ -136,17 +135,17 @@ router.post('/items/excel', upload.single('file'), async (req, res) => {
     return res.status(500).json({ error: 'Server error' });
   }
 });
+
+/* =========================
+   POST /admin/manual-stock-pull
+   (STEP A ONLY – SAFE)
+========================= */
 router.post('/admin/manual-stock-pull', async (req, res) => {
   try {
-    // READ HEADERS FIRST
     const companyId = req.headers['x-company-id'];
     const tdlKey = req.headers['x-tdl-key'];
 
-    console.log(
-      'DEBUG HEADERS READ:',
-      companyId,
-      tdlKey
-    );
+    console.log('DEBUG HEADERS READ:', companyId, tdlKey);
 
     if (!companyId) {
       return res.status(400).json({ error: 'company_id required' });
@@ -155,90 +154,14 @@ router.post('/admin/manual-stock-pull', async (req, res) => {
     // STEP A: pull from Tally
     const xml = await pullStockFromTally(companyId);
 
-    // (do nothing else yet)
-
-    return res.json({ ok: true });
+    return res.json({
+      ok: true,
+      message: 'Tally pull successful (Step A)',
+      xml_received: !!xml
+    });
 
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ error: 'manual pull failed' });
-  }
-});
-
-    // STEP B: parse XML → normalized items
-    const items = parseStockItems(xml);
-    /*
-      items = [{
-        tally_guid,
-        item_name,
-        uom,
-        quantity
-      }]
-    */
-
-zz
-    // STEP A: pull from Tally
-    const xml = await pullStockFromTally(companyId);
-
-    // STEP B: parse XML → normalized items
-    const items = parseStockItems(xml);
-    /*
-      items = [{
-        tally_guid,
-        item_name,
-        uom,
-        quantity
-      }]
-    */
-
-    // STEP C: UPSERT items (by tally_guid)
-    for (const i of items) {
-      await supabaseAdmin.from('items').upsert({
-        company_id: companyId,
-        tally_guid: i.tally_guid,
-        item_name: i.item_name,
-        uom: i.uom
-      }, {
-        onConflict: 'company_id,tally_guid'
-      });
-    }
-
-    // STEP D: create snapshot
-    const { data: snapshot } = await supabaseAdmin
-      .from('stock_snapshots')
-      .insert({ company_id: companyId })
-      .select('snapshot_id')
-      .single();
-
-    // STEP E: resolve item_ids
-    const { data: dbItems } = await supabaseAdmin
-      .from('items')
-      .select('item_id,tally_guid')
-      .eq('company_id', companyId);
-
-    const itemMap = Object.fromEntries(
-      dbItems.map(i => [i.tally_guid, i.item_id])
-    );
-
-    // STEP F: insert snapshot items
-    const rows = items.map(i => ({
-      snapshot_id: snapshot.snapshot_id,
-      item_id: itemMap[i.tally_guid],
-      stock: i.quantity
-    }));
-
-    await supabaseAdmin
-      .from('stock_snapshots_items')
-      .insert(rows);
-
-    return res.json({
-      ok: true,
-      snapshot_id: snapshot.snapshot_id,
-      items: rows.length
-    });
-
-  } catch (e) {
-    console.error(e);
     return res.status(500).json({ error: 'manual pull failed' });
   }
 });
