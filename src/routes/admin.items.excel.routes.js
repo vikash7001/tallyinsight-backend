@@ -166,8 +166,10 @@ router.post('/admin/manual-stock-pull', async (req, res) => {
     const xml = await pullStockFromTally(company.company_name);
 
     // STEP D-2: parse + log only
-    const items = parseStockItems(xml);
-    console.log('PARSED ITEM COUNT:', items.length);
+const items = parseStockItems(xml);
+console.log('PARSED ITEM COUNT:', items.length);
+
+// STEP E: UPSERT items FIRST
 for (const i of items) {
   await supabaseAdmin
     .from('items')
@@ -184,10 +186,22 @@ for (const i of items) {
     );
 }
 
-    return res.json({
-      ok: true,
-      parsed_items: items.length
-    });
+// STEP F: create snapshot AFTER items exist
+const { data: snapshot, error: snapErr } = await supabaseAdmin
+  .from('stock_snapshots')
+  .insert({ company_id: companyId })
+  .select('snapshot_id')
+  .single();
+
+if (snapErr) {
+  return res.status(500).json({ error: 'Snapshot create failed' });
+}
+
+return res.json({
+  ok: true,
+  parsed_items: items.length,
+  snapshot_id: snapshot.snapshot_id
+});
 
   } catch (err) {
     console.error(err);
