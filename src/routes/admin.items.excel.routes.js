@@ -224,11 +224,11 @@ return res.json({
   snapshot_id: snapshot.snapshot_id
 });
 
-  } catch (err) {
-  console.error('MANUAL PULL ERROR:', err);
+} catch (err) {
+  console.error('MANUAL PULL ERROR FULL:', err);
   return res.status(500).json({
     error: 'manual pull failed',
-    details: err.message
+    details: err?.message || err
   });
 }
 
