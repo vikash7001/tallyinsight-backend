@@ -140,7 +140,8 @@ router.post('/items/excel', upload.single('file'), async (req, res) => {
    POST /admin/manual-stock-pull
    (STEP D-2: PARSE + LOG ONLY)
 ========================= */
-router.post('/admin/manual-stock-pull', async (req, res) => {
+router.post('/manual-stock-pull', async (req, res) => {
+
   try {
     const companyId = req.headers['x-company-id'];
     const tdlKey = req.headers['x-tdl-key'];
