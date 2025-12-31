@@ -14,6 +14,7 @@ import adminItemsExcelRoutes from './routes/admin.items.excel.routes.js';
 import adminHeaderAuth from './middleware/adminHeaderAuth.js';
 import tdlStockRoutes from './routes/tdl.stock.routes.js';
 import agentStockRoutes from './routes/agent.stock.routes.js';
+import agentProvisionRoutes from './routes/agent.provision.routes.js';
 
 
 
@@ -39,5 +40,6 @@ app.use('/admin', adminItemsExcelRoutes);
 // 🔐 TDL routes (no user auth)
 app.use('/tdl', tdlStockRoutes);
 app.use('/agent', agentStockRoutes);
+app.use('/agent', agentProvisionRoutes);
 
 export default app;
