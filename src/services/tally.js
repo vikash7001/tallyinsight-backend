@@ -1,4 +1,4 @@
-import fetch from 'node-fetch';
+
 
 /**
  * Pull stock data from Tally Prime via HTTP/XML
