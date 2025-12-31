@@ -138,19 +138,32 @@ router.post('/items/excel', upload.single('file'), async (req, res) => {
 });
 router.post('/admin/manual-stock-pull', async (req, res) => {
   try {
+    // READ HEADERS FIRST
     const companyId = req.headers['x-company-id'];
+    const tdlKey = req.headers['x-tdl-key'];
+
+    console.log(
+      'DEBUG HEADERS READ:',
+      companyId,
+      tdlKey
+    );
 
     if (!companyId) {
       return res.status(400).json({ error: 'company_id required' });
     }
-console.log(
-  'DEBUG HEADERS READ:',
-  req.headers['x-company-id'],
-  req.headers['x-tdl-key']
-);
 
     // STEP A: pull from Tally
     const xml = await pullStockFromTally(companyId);
+
+    // (do nothing else yet)
+
+    return res.json({ ok: true });
+
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'manual pull failed' });
+  }
+});
 
     // STEP B: parse XML → normalized items
     const items = parseStockItems(xml);
