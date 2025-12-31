@@ -2,6 +2,7 @@ import express from 'express';
 import XLSX from 'xlsx';
 import multer from 'multer';
 import { supabaseAdmin } from '../config/supabase.js';
+import { pullStockFromTally } from '../services/tally.js';
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -137,7 +138,7 @@ router.post('/items/excel', upload.single('file'), async (req, res) => {
 
 /* =========================
    POST /admin/manual-stock-pull
-   (STEP A ONLY – SAFE)
+	   (STEP A ONLY – SAFE)
 ========================= */
 router.post('/admin/manual-stock-pull', async (req, res) => {
   try {
