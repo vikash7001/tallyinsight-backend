@@ -2,7 +2,6 @@ import express from 'express';
 import XLSX from 'xlsx';
 import multer from 'multer';
 import { supabaseAdmin } from '../config/supabase.js';
-import { pullStockFromTally, parseStockItems } from '../services/tally.js';
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
