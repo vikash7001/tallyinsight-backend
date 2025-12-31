@@ -225,9 +225,12 @@ return res.json({
 });
 
   } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: 'manual pull failed' });
-  }
-});
+  console.error('MANUAL PULL ERROR:', err);
+  return res.status(500).json({
+    error: 'manual pull failed',
+    details: err.message
+  });
+}
+
 
 export default router;
