@@ -196,6 +196,25 @@ const { data: snapshot, error: snapErr } = await supabaseAdmin
 if (snapErr) {
   return res.status(500).json({ error: 'Snapshot create failed' });
 }
+// STEP G: insert stock quantities for this snapshot
+for (const i of items) {
+  const { data: itemRow, error: itemErr } = await supabaseAdmin
+    .from('items')
+    .select('item_id')
+    .eq('company_id', companyId)
+    .eq('tally_guid', i.tally_guid)
+    .single();
+
+  if (itemErr || !itemRow) continue;
+
+  await supabaseAdmin
+    .from('stock_snapshots_items')
+    .insert({
+      snapshot_id: snapshot.snapshot_id,
+      item_id: itemRow.item_id,
+      stock: i.quantity
+    });
+}
 
 return res.json({
   ok: true,
