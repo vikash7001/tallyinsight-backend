@@ -52,3 +52,39 @@ export async function pullStockFromTally(companyName) {
   const xml = await response.text();
   return xml;
 }
+export function parseStockItems(xml) {
+  if (!xml || typeof xml !== 'string') return [];
+
+  const items = [];
+  const stockItemRegex = /<STOCKITEM[\s\S]*?<\/STOCKITEM>/gi;
+  const blocks = xml.match(stockItemRegex) || [];
+
+  for (const block of blocks) {
+    const guid = getTag(block, 'GUID');
+    const name = getTag(block, 'NAME');
+    const uom = getTag(block, 'BASEUNITS');
+    const closing = getTag(block, 'CLOSINGBALANCE');
+
+    if (!guid || !closing) continue;
+
+    const qty = Number(
+      closing.replace(/[^\d.-]/g, '')
+    );
+
+    items.push({
+      tally_guid: guid.trim(),
+      item_name: name ? name.trim() : '',
+      uom: uom ? uom.trim() : '',
+      quantity: isNaN(qty) ? 0 : qty
+    });
+  }
+
+  return items;
+}
+
+function getTag(xml, tag) {
+  const match = xml.match(
+    new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i')
+  );
+  return match ? match[1] : null;
+}

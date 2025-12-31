@@ -2,7 +2,7 @@ import express from 'express';
 import XLSX from 'xlsx';
 import multer from 'multer';
 import { supabaseAdmin } from '../config/supabase.js';
-import { pullStockFromTally } from '../services/tally.js';
+import { pullStockFromTally, parseStockItems } from '../services/tally.js';
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -138,7 +138,7 @@ router.post('/items/excel', upload.single('file'), async (req, res) => {
 
 /* =========================
    POST /admin/manual-stock-pull
-	   (STEP A ONLY – SAFE)
+   (STEP D-2: PARSE + LOG ONLY)
 ========================= */
 router.post('/admin/manual-stock-pull', async (req, res) => {
   try {
@@ -151,24 +151,27 @@ router.post('/admin/manual-stock-pull', async (req, res) => {
       return res.status(400).json({ error: 'company_id required' });
     }
 
-    // STEP A: pull from Tally
+    // Resolve company name
     const { data: company, error } = await supabaseAdmin
-  .from('companies')
-  .select('company_name')
-  .eq('company_id', companyId)
-  .single();
+      .from('companies')
+      .select('company_name')
+      .eq('company_id', companyId)
+      .single();
 
-if (error || !company?.company_name) {
-  return res.status(400).json({ error: 'Company not found' });
-}
+    if (error || !company?.company_name) {
+      return res.status(400).json({ error: 'Company not found' });
+    }
 
-const xml = await pullStockFromTally(company.company_name);
+    // STEP A: pull XML
+    const xml = await pullStockFromTally(company.company_name);
 
+    // STEP D-2: parse + log only
+    const items = parseStockItems(xml);
+    console.log('PARSED ITEM COUNT:', items.length);
 
     return res.json({
       ok: true,
-      message: 'Tally pull successful (Step A)',
-      xml_received: !!xml
+      parsed_items: items.length
     });
 
   } catch (err) {
