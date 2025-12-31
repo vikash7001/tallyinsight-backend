@@ -143,7 +143,27 @@ router.post('/admin/manual-stock-pull', async (req, res) => {
     if (!companyId) {
       return res.status(400).json({ error: 'company_id required' });
     }
+console.log(
+  'DEBUG HEADERS READ:',
+  req.headers['x-company-id'],
+  req.headers['x-tdl-key']
+);
 
+    // STEP A: pull from Tally
+    const xml = await pullStockFromTally(companyId);
+
+    // STEP B: parse XML → normalized items
+    const items = parseStockItems(xml);
+    /*
+      items = [{
+        tally_guid,
+        item_name,
+        uom,
+        quantity
+      }]
+    */
+
+zz
     // STEP A: pull from Tally
     const xml = await pullStockFromTally(companyId);
 
