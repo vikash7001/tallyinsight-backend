@@ -2,6 +2,11 @@ import express from 'express';
 import { supabaseAdmin } from '../config/supabase.js';
 
 const router = express.Router();
+router.post('/stock', async (req, res) => {
+  console.log('AGENT /stock HIT', {
+    headers: req.headers,
+    bodyCount: Array.isArray(req.body?.items) ? req.body.items.length : null
+  });
 
 /*
   POST /agent/stock
