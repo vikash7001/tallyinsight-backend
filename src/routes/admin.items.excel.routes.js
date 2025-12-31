@@ -136,5 +136,78 @@ router.post('/items/excel', upload.single('file'), async (req, res) => {
     return res.status(500).json({ error: 'Server error' });
   }
 });
+router.post('/admin/manual-stock-pull', async (req, res) => {
+  try {
+    const companyId = req.headers['x-company-id'];
+
+    if (!companyId) {
+      return res.status(400).json({ error: 'company_id required' });
+    }
+
+    // STEP A: pull from Tally
+    const xml = await pullStockFromTally(companyId);
+
+    // STEP B: parse XML → normalized items
+    const items = parseStockItems(xml);
+    /*
+      items = [{
+        tally_guid,
+        item_name,
+        uom,
+        quantity
+      }]
+    */
+
+    // STEP C: UPSERT items (by tally_guid)
+    for (const i of items) {
+      await supabaseAdmin.from('items').upsert({
+        company_id: companyId,
+        tally_guid: i.tally_guid,
+        item_name: i.item_name,
+        uom: i.uom
+      }, {
+        onConflict: 'company_id,tally_guid'
+      });
+    }
+
+    // STEP D: create snapshot
+    const { data: snapshot } = await supabaseAdmin
+      .from('stock_snapshots')
+      .insert({ company_id: companyId })
+      .select('snapshot_id')
+      .single();
+
+    // STEP E: resolve item_ids
+    const { data: dbItems } = await supabaseAdmin
+      .from('items')
+      .select('item_id,tally_guid')
+      .eq('company_id', companyId);
+
+    const itemMap = Object.fromEntries(
+      dbItems.map(i => [i.tally_guid, i.item_id])
+    );
+
+    // STEP F: insert snapshot items
+    const rows = items.map(i => ({
+      snapshot_id: snapshot.snapshot_id,
+      item_id: itemMap[i.tally_guid],
+      stock: i.quantity
+    }));
+
+    await supabaseAdmin
+      .from('stock_snapshots_items')
+      .insert(rows);
+
+    return res.json({
+      ok: true,
+      snapshot_id: snapshot.snapshot_id,
+      items: rows.length
+    });
+
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ error: 'manual pull failed' });
+  }
+});
 
 export default router;
