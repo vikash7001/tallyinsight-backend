@@ -152,7 +152,18 @@ router.post('/admin/manual-stock-pull', async (req, res) => {
     }
 
     // STEP A: pull from Tally
-    const xml = await pullStockFromTally(companyId);
+    const { data: company, error } = await supabaseAdmin
+  .from('companies')
+  .select('company_name')
+  .eq('company_id', companyId)
+  .single();
+
+if (error || !company?.company_name) {
+  return res.status(400).json({ error: 'Company not found' });
+}
+
+const xml = await pullStockFromTally(company.company_name);
+
 
     return res.json({
       ok: true,
