@@ -168,6 +168,21 @@ router.post('/admin/manual-stock-pull', async (req, res) => {
     // STEP D-2: parse + log only
     const items = parseStockItems(xml);
     console.log('PARSED ITEM COUNT:', items.length);
+for (const i of items) {
+  await supabaseAdmin
+    .from('items')
+    .upsert(
+      {
+        company_id: companyId,
+        tally_guid: i.tally_guid,
+        item_name: i.item_name,
+        uom: i.uom
+      },
+      {
+        onConflict: 'company_id,tally_guid'
+      }
+    );
+}
 
     return res.json({
       ok: true,
