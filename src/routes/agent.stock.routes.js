@@ -2,13 +2,6 @@ import express from 'express';
 import { supabaseAdmin } from '../config/supabase.js';
 
 const router = express.Router();
-router.post('/stock', async (req, res) => {
-  console.log('AGENT /stock HIT', {
-    headers: req.headers,
-    bodyCount: Array.isArray(req.body?.items)
-      ? req.body.items.length
-      : null
-  });
 
 /*
   POST /agent/stock
@@ -28,6 +21,13 @@ router.post('/stock', async (req, res) => {
     }
 */
 router.post('/stock', async (req, res) => {
+  console.log('AGENT /stock HIT', {
+    headers: req.headers,
+    bodyCount: Array.isArray(req.body?.items)
+      ? req.body.items.length
+      : null
+  });
+
   try {
     const companyId = req.header('x-company-id');
     const userId = req.header('x-user-id');
