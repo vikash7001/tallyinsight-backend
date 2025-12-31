@@ -59,18 +59,19 @@ router.post('/stock', async (req, res) => {
     /* =========================
        RESOLVE COMPANY (PHASE 1)
     ========================= */
-    const { data: adminCompany, error: companyErr } = await supabaseAdmin
-      .from('admin_companies')
-      .select('company_id')
-      .eq('admin_id', device.admin_id)
-      .limit(1)
-      .single();
+const { data: adminUser, error: adminErr } = await supabaseAdmin
+  .from('app_users')
+  .select('company_id')
+  .eq('user_id', device.admin_id)
+  .eq('role', 'ADMIN')
+  .eq('active', true)
+  .single();
 
-    if (companyErr || !adminCompany) {
-      return res.status(400).json({ error: 'No company linked to admin' });
-    }
+if (adminErr || !adminUser) {
+  return res.status(400).json({ error: 'Admin has no active company' });
+}
 
-    const companyId = adminCompany.company_id;
+const companyId = adminUser.company_id;
 
     /* =========================
        VALIDATE ITEMS
