@@ -168,6 +168,7 @@ router.post('/admin/manual-stock-pull', async (req, res) => {
     // STEP D-2: parse + log only
 const items = parseStockItems(xml);
 console.log('PARSED ITEM COUNT:', items.length);
+console.log('ABOUT TO INSERT SNAPSHOT FOR', companyId);
 
 // STEP E: UPSERT items FIRST
 for (const i of items) {
