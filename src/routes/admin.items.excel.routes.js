@@ -138,21 +138,15 @@ router.post('/items/excel', upload.single('file'), async (req, res) => {
 
 /* =========================
    POST /admin/manual-stock-pull
-   (STEP D-2: PARSE + LOG ONLY)
 ========================= */
 router.post('/manual-stock-pull', async (req, res) => {
-
   try {
     const companyId = req.headers['x-company-id'];
-    const tdlKey = req.headers['x-tdl-key'];
-
-    console.log('DEBUG HEADERS READ:', companyId, tdlKey);
 
     if (!companyId) {
       return res.status(400).json({ error: 'company_id required' });
     }
 
-    // Resolve company name
     const { data: company, error } = await supabaseAdmin
       .from('companies')
       .select('company_name')
@@ -163,74 +157,62 @@ router.post('/manual-stock-pull', async (req, res) => {
       return res.status(400).json({ error: 'Company not found' });
     }
 
-    // STEP A: pull XML
     const xml = await pullStockFromTally(company.company_name);
 
-    // STEP D-2: parse + log only
-const items = parseStockItems(xml);
-console.log('PARSED ITEM COUNT:', items.length);
-console.log('ABOUT TO INSERT SNAPSHOT FOR', companyId);
+    const items = parseStockItems(xml);
+    console.log('PARSED ITEM COUNT:', items.length);
 
-// STEP E: UPSERT items FIRST
-for (const i of items) {
-  await supabaseAdmin
-    .from('items')
-    .upsert(
-      {
-        company_id: companyId,
-        tally_guid: i.tally_guid,
-        item_name: i.item_name,
-        uom: i.uom
-      },
-      {
-        onConflict: 'company_id,tally_guid'
-      }
-    );
-}
+    for (const i of items) {
+      await supabaseAdmin.from('items').upsert(
+        {
+          company_id: companyId,
+          tally_guid: i.tally_guid,
+          item_name: i.item_name,
+          uom: i.uom
+        },
+        { onConflict: 'company_id,tally_guid' }
+      );
+    }
 
-// STEP F: create snapshot AFTER items exist
-const { data: snapshot, error: snapErr } = await supabaseAdmin
-  .from('stock_snapshots')
-  .insert({ company_id: companyId })
-  .select('snapshot_id')
-  .single();
+    const { data: snapshot, error: snapErr } = await supabaseAdmin
+      .from('stock_snapshots')
+      .insert({ company_id: companyId })
+      .select('snapshot_id')
+      .single();
 
-if (snapErr) {
-  return res.status(500).json({ error: 'Snapshot create failed' });
-}
-// STEP G: insert stock quantities for this snapshot
-for (const i of items) {
-  const { data: itemRow, error: itemErr } = await supabaseAdmin
-    .from('items')
-    .select('item_id')
-    .eq('company_id', companyId)
-    .eq('tally_guid', i.tally_guid)
-    .single();
+    if (snapErr) {
+      return res.status(500).json({ error: 'Snapshot create failed' });
+    }
 
-  if (itemErr || !itemRow) continue;
+    for (const i of items) {
+      const { data: itemRow } = await supabaseAdmin
+        .from('items')
+        .select('item_id')
+        .eq('company_id', companyId)
+        .eq('tally_guid', i.tally_guid)
+        .single();
 
-  await supabaseAdmin
-    .from('stock_snapshots_items')
-    .insert({
-      snapshot_id: snapshot.snapshot_id,
-      item_id: itemRow.item_id,
-      stock: i.quantity
+      if (!itemRow) continue;
+
+      await supabaseAdmin.from('stock_snapshots_items').insert({
+        snapshot_id: snapshot.snapshot_id,
+        item_id: itemRow.item_id,
+        stock: i.quantity
+      });
+    }
+
+    return res.json({
+      ok: true,
+      parsed_items: items.length,
+      snapshot_id: snapshot.snapshot_id
     });
-}
-
-return res.json({
-  ok: true,
-  parsed_items: items.length,
-  snapshot_id: snapshot.snapshot_id
+  } catch (err) {
+    console.error('MANUAL PULL ERROR FULL:', err);
+    return res.status(500).json({
+      error: 'manual pull failed',
+      details: err?.message || err
+    });
+  }
 });
-
-} catch (err) {
-  console.error('MANUAL PULL ERROR FULL:', err);
-  return res.status(500).json({
-    error: 'manual pull failed',
-    details: err?.message || err
-  });
-}
-
 
 export default router;
