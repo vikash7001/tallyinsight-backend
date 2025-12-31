@@ -6,8 +6,8 @@ const router = express.Router();
 /*
   POST /agent/stock
   Headers:
-    x-company-id
-    x-user-id
+    x-device-id
+    x-device-token
   Body:
     {
       items: [
@@ -29,13 +29,52 @@ router.post('/stock', async (req, res) => {
   });
 
   try {
-    const companyId = req.header('x-company-id');
-    const userId = req.header('x-user-id');
+    /* =========================
+       DEVICE AUTH
+    ========================= */
+    const deviceId = req.header('x-device-id');
+    const deviceToken = req.header('x-device-token');
 
-    if (!companyId || !userId) {
-      return res.status(400).json({ error: 'Missing headers' });
+    if (!deviceId || !deviceToken) {
+      return res.status(401).json({ error: 'Missing device credentials' });
     }
 
+    const { data: device, error: deviceErr } = await supabaseAdmin
+      .from('devices')
+      .select('device_id, admin_id')
+      .eq('device_id', deviceId)
+      .eq('device_token', deviceToken)
+      .single();
+
+    if (deviceErr || !device) {
+      return res.status(401).json({ error: 'Invalid device' });
+    }
+
+    // update last seen
+    await supabaseAdmin
+      .from('devices')
+      .update({ last_seen: new Date().toISOString() })
+      .eq('device_id', deviceId);
+
+    /* =========================
+       RESOLVE COMPANY (PHASE 1)
+    ========================= */
+    const { data: adminCompany, error: companyErr } = await supabaseAdmin
+      .from('admin_companies')
+      .select('company_id')
+      .eq('admin_id', device.admin_id)
+      .limit(1)
+      .single();
+
+    if (companyErr || !adminCompany) {
+      return res.status(400).json({ error: 'No company linked to admin' });
+    }
+
+    const companyId = adminCompany.company_id;
+
+    /* =========================
+       VALIDATE ITEMS
+    ========================= */
     const items = Array.isArray(req.body.items) ? req.body.items : [];
     if (items.length === 0) {
       return res.status(400).json({ error: 'No items received' });
