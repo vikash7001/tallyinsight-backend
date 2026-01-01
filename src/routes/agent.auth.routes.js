@@ -4,7 +4,6 @@ import { supabaseAdmin } from '../config/supabase.js';
 
 const router = express.Router();
 
-// POST /agent/login/password
 router.post('/login/password', async (req, res) => {
   const { identifier, password } = req.body;
 
@@ -12,7 +11,6 @@ router.post('/login/password', async (req, res) => {
     return res.status(400).json({ error: 'Missing credentials' });
   }
 
-  // normalize email (mobile left as-is)
   const emailIdentifier = identifier.toLowerCase();
 
   const { data: user, error } = await supabaseAdmin
@@ -34,7 +32,7 @@ router.post('/login/password', async (req, res) => {
     return res.status(401).json({ error: 'Invalid login' });
   }
 
-  return res.json({
+  res.json({
     user_id: user.user_id,
     admin_id: user.admin_id
   });
