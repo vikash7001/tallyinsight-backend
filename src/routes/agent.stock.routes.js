@@ -29,18 +29,18 @@ router.get('/companies', async (req, res) => {
       return res.status(403).json({ error: 'Invalid or revoked device' });
     }
 
-    const { data, error } = await supabaseAdmin
-      .from('app_users')
-      .select(`
-        company_id,
-        companies (
-          id,
-          name
-        )
-      `)
-      .eq('admin_id', device.admin_id)
-      .eq('role', 'ADMIN')
-      .eq('active', true);
+const { data, error } = await supabaseAdmin
+  .from('app_users')
+  .select(`
+    company_id,
+    companies (
+      id,
+      name
+    )
+  `)
+  .eq('user_id', device.admin_id)
+  .eq('role', 'ADMIN')
+  .eq('active', true);
 
     if (error) {
       console.error('COMPANY FETCH ERROR:', error);
