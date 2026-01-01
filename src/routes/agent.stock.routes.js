@@ -19,12 +19,16 @@ router.get('/companies', async (req, res) => {
     }
 
     // authenticate device
-    const { data: device, error: deviceErr } = await supabaseAdmin
-      .from('devices')
-      .select('admin_id')
-      .eq('device_id', deviceId)
-      .eq('device_token', deviceToken)
-      .single();
+const { data: device, error: deviceErr } = await supabaseAdmin
+  .from('devices')
+  .select('admin_id, revoked')
+  .eq('device_id', deviceId)
+  .eq('device_token', deviceToken)
+  .single();
+
+if (device.revoked) {
+  return res.status(403).json({ error: 'DEVICE_REVOKED' });
+}
 
     if (deviceErr || !device) {
       return res.status(403).json({ error: 'Invalid device' });
