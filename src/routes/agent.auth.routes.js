@@ -11,16 +11,22 @@ router.post('/login', async (req, res) => {
   }
 
   // 🔐 reuse existing auth logic (example)
-  const { data: user, error } = await supabaseAdmin
-    .from('app_users')
-    .select('user_id, admin_id, active')
-    .or(`email.eq.${identifier},mobile.eq.${identifier}`)
-    .eq('password', password) // assume already hashed/verified in real code
-    .single();
+const { data: user, error } = await supabaseAdmin
+  .from('app_users')
+  .select('user_id, admin_id, active, password')
+  .eq('mobile', identifier)
+  .single();
 
-  if (error || !user || !user.active) {
-    return res.status(401).json({ error: 'Invalid login' });
-  }
+if (error || !user || !user.active) {
+  return res.status(401).json({ error: 'Invalid login' });
+}
+
+// ✅ TEMP bootstrap rule
+// If password is NULL → allow login
+if (user.password && user.password !== password) {
+  return res.status(401).json({ error: 'Invalid password' });
+}
+
 
   // 🔎 fetch company + subscription status
   const { data: companies } = await supabaseAdmin
