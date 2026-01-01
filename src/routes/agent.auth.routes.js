@@ -18,6 +18,10 @@ router.post('/login/password', async (req, res) => {
     .select('user_id, admin_id, active, password_hash')
     .or(`email.eq.${emailIdentifier},mobile.eq.${identifier}`)
     .single();
+console.log('IDENTIFIER:', identifier);
+console.log('EMAIL NORMALIZED:', emailIdentifier);
+console.log('USER ROW:', user);
+console.log('SUPABASE ERROR:', error);
 
   if (error || !user || !user.active) {
     return res.status(401).json({ error: 'Invalid login' });
