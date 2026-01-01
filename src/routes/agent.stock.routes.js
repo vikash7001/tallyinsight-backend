@@ -4,6 +4,62 @@ import { supabaseAdmin } from '../config/supabase.js';
 const router = express.Router();
 
 /*
+  GET /agent/companies
+  Headers:
+    x-device-id
+    x-device-token
+*/
+router.get('/companies', async (req, res) => {
+  try {
+    const deviceId = req.header('x-device-id');
+    const deviceToken = req.header('x-device-token');
+
+    if (!deviceId || !deviceToken) {
+      return res.status(401).json({ error: 'Missing device credentials' });
+    }
+
+    const { data: device, error: deviceErr } = await supabaseAdmin
+      .from('devices')
+      .select('admin_id, revoked')
+      .eq('device_id', deviceId)
+      .eq('device_token', deviceToken)
+      .single();
+
+    if (deviceErr || !device || device.revoked) {
+      return res.status(403).json({ error: 'Invalid or revoked device' });
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('app_users')
+      .select(`
+        company_id,
+        companies (
+          id,
+          name
+        )
+      `)
+      .eq('admin_id', device.admin_id)
+      .eq('role', 'ADMIN')
+      .eq('active', true);
+
+    if (error) {
+      console.error('COMPANY FETCH ERROR:', error);
+      return res.status(500).json({ error: 'Company fetch failed' });
+    }
+
+    const companies = (data || [])
+      .map(r => r.companies)
+      .filter(Boolean);
+
+    return res.json({ companies });
+
+  } catch (err) {
+    console.error('AGENT /companies ERROR:', err);
+    return res.status(500).json({ error: 'Agent companies failed' });
+  }
+});
+
+/*
   POST /agent/stock
   Headers:
     x-device-id
