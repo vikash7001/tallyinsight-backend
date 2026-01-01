@@ -13,6 +13,9 @@ import adminItemsExcelRoutes from './routes/admin.items.excel.routes.js';
 import adminDevicesRoutes from './routes/admin.devices.routes.js';
 
 import agentAuthRoutes from './routes/agent.auth.routes.js';
+import agentOtpRoutes from './routes/agent.otp.routes.js';
+import agentOtpVerifyRoutes from './routes/agent.otp.verify.routes.js';
+
 import agentCompaniesRoutes from './routes/agent.companies.routes.js';
 import agentProvisionRoutes from './routes/agent.provision.routes.js';
 import agentStockRoutes from './routes/agent.stock.routes.js';
@@ -48,6 +51,9 @@ app.use('/tdl', tdlStockRoutes);
 
 // 🤖 Agent routes
 app.use('/agent', agentAuthRoutes);
+app.use('/agent', agentOtpRoutes);
+app.use('/agent', agentOtpVerifyRoutes);
+
 app.use('/agent', agentCompaniesRoutes);
 app.use('/agent', agentProvisionRoutes);
 app.use('/agent', agentStockRoutes);
