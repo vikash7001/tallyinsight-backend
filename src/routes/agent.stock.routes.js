@@ -18,6 +18,7 @@ router.get('/companies', async (req, res) => {
       return res.status(401).json({ error: 'Missing device credentials' });
     }
 
+    // authenticate device
     const { data: device, error: deviceErr } = await supabaseAdmin
       .from('devices')
       .select('admin_id')
@@ -26,54 +27,38 @@ router.get('/companies', async (req, res) => {
       .single();
 
     if (deviceErr || !device) {
-      return res.status(403).json({ error: 'Invalid or revoked device' });
+      return res.status(403).json({ error: 'Invalid device' });
     }
 
-const { data, error } = await supabaseAdmin
-// 1️⃣ fetch company_ids
-const { data: links, error: linkErr } = await supabaseAdmin
-  .from('app_users')
-  .select('company_id')
-  .eq('user_id', device.admin_id)
-  .eq('role', 'ADMIN')
-  .eq('active', true);
+    // 1️⃣ get company_ids from app_users
+    const { data: links, error: linkErr } = await supabaseAdmin
+      .from('app_users')
+      .select('company_id')
+      .eq('user_id', device.admin_id)
+      .eq('role', 'ADMIN')
+      .eq('active', true);
 
-if (linkErr) {
-  console.error('APP_USERS ERROR:', linkErr);
-  return res.status(500).json({ error: 'Company fetch failed' });
-}
-
-const companyIds = (links || []).map(r => r.company_id);
-
-if (companyIds.length === 0) {
-  return res.json({ companies: [] });
-}
-
-// 2️⃣ fetch companies
-const { data: companies, error: compErr } = await supabaseAdmin
-  .from('companies')
-  .select('id, name')
-  .in('id', companyIds);
-
-if (compErr) {
-  console.error('COMPANIES ERROR:', compErr);
-  return res.status(500).json({ error: 'Company fetch failed' });
-}
-
-return res.json({ companies });
-
-  .eq('user_id', device.admin_id)
-  .eq('role', 'ADMIN')
-  .eq('active', true);
-
-    if (error) {
-      console.error('COMPANY FETCH ERROR:', error);
+    if (linkErr) {
+      console.error('APP_USERS ERROR:', linkErr);
       return res.status(500).json({ error: 'Company fetch failed' });
     }
 
-    const companies = (data || [])
-      .map(r => r.companies)
-      .filter(Boolean);
+    const companyIds = (links || []).map(r => r.company_id);
+
+    if (companyIds.length === 0) {
+      return res.json({ companies: [] });
+    }
+
+    // 2️⃣ fetch companies
+    const { data: companies, error: compErr } = await supabaseAdmin
+      .from('companies')
+      .select('id, name')
+      .in('id', companyIds);
+
+    if (compErr) {
+      console.error('COMPANIES ERROR:', compErr);
+      return res.status(500).json({ error: 'Company fetch failed' });
+    }
 
     return res.json({ companies });
 
