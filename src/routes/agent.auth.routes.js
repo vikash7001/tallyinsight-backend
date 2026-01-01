@@ -15,12 +15,15 @@ router.post('/login/password', async (req, res) => {
   const { data: user, error } = await supabaseAdmin
     .from('app_users')
     .select('user_id, admin_id, active, password_hash')
-    .or(`email.eq.${identifier},mobile.eq.${identifier}`)
+    .or(`email.eq.${id},mobile.eq.${identifier}`)
     .single();
 
   if (error || !user || !user.active) {
     return res.status(401).json({ error: 'Invalid login' });
   }
+if (!user.password_hash) {
+  return res.status(401).json({ error: 'Password not set' });
+}
 
   const ok = await bcrypt.compare(password, user.password_hash || '');
   if (!ok) {
