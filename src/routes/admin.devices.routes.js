@@ -5,17 +5,20 @@ const router = express.Router();
 
 /*
   POST /admin/devices/:device_id/revoke
-  Header:
-    x-admin-id   (already validated by adminHeaderAuth)
+  Headers:
+    x-user-id
+    x-company-id
 */
 router.post('/devices/:device_id/revoke', async (req, res) => {
   try {
     const { device_id } = req.params;
+    const adminId = req.user_id; // set by adminHeaderAuth
 
     if (!device_id) {
       return res.status(400).json({ error: 'device_id required' });
     }
 
+    // revoke device (ownership check can be added later)
     const { error } = await supabaseAdmin
       .from('devices')
       .update({ revoked: true })
