@@ -15,7 +15,7 @@ const otp = req.body.otp;
 
   const { data: user } = await supabaseAdmin
     .from('app_users')
-    .select('user_id, admin_id, active')
+    .select('user_id, active')
     .eq('email', email)
     .single();
 
