@@ -20,12 +20,12 @@ router.get('/companies', async (req, res) => {
 
     const { data: device, error: deviceErr } = await supabaseAdmin
       .from('devices')
-      .select('admin_id, revoked')
+      .select('admin_id')
       .eq('device_id', deviceId)
       .eq('device_token', deviceToken)
       .single();
 
-    if (deviceErr || !device || device.revoked) {
+    if (deviceErr || !device) {
       return res.status(403).json({ error: 'Invalid or revoked device' });
     }
 
