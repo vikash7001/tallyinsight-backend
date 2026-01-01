@@ -12,20 +12,24 @@ router.post('/login/password', async (req, res) => {
     return res.status(400).json({ error: 'Missing credentials' });
   }
 
+  // normalize email (mobile left as-is)
+  const emailIdentifier = identifier.toLowerCase();
+
   const { data: user, error } = await supabaseAdmin
     .from('app_users')
     .select('user_id, admin_id, active, password_hash')
-    .or(`email.eq.${id},mobile.eq.${identifier}`)
+    .or(`email.eq.${emailIdentifier},mobile.eq.${identifier}`)
     .single();
 
   if (error || !user || !user.active) {
     return res.status(401).json({ error: 'Invalid login' });
   }
-if (!user.password_hash) {
-  return res.status(401).json({ error: 'Password not set' });
-}
 
-  const ok = await bcrypt.compare(password, user.password_hash || '');
+  if (!user.password_hash) {
+    return res.status(401).json({ error: 'Password not set' });
+  }
+
+  const ok = await bcrypt.compare(password, user.password_hash);
   if (!ok) {
     return res.status(401).json({ error: 'Invalid login' });
   }
