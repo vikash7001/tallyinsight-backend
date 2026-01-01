@@ -8,17 +8,6 @@ const router = express.Router();
   Headers:
     x-device-id
     x-device-token
-  Body:
-    {
-      items: [
-        {
-          tally_guid,
-          item_name,
-          uom,
-          quantity
-        }
-      ]
-    }
 */
 router.post('/stock', async (req, res) => {
   console.log('AGENT /stock HIT', {
@@ -40,7 +29,7 @@ router.post('/stock', async (req, res) => {
 
     const { data: device, error: deviceErr } = await supabaseAdmin
       .from('devices')
-      .select('device_id, admin_id')
+      .select('device_id, company_id')
       .eq('device_id', deviceId)
       .eq('device_token', deviceToken)
       .single();
@@ -49,27 +38,18 @@ router.post('/stock', async (req, res) => {
       return res.status(401).json({ error: 'Invalid device' });
     }
 
+    if (!device.company_id) {
+      return res.status(400).json({
+        error: 'DEVICE_COMPANY_NOT_SET'
+      });
+    }
+
     await supabaseAdmin
       .from('devices')
       .update({ last_seen: new Date().toISOString() })
       .eq('device_id', deviceId);
 
-    /* =========================
-       RESOLVE COMPANY
-    ========================= */
-    const { data: adminUser, error: adminErr } = await supabaseAdmin
-      .from('app_users')
-      .select('company_id')
-      .eq('user_id', device.admin_id)
-      .eq('role', 'ADMIN')
-      .eq('active', true)
-      .single();
-
-    if (adminErr || !adminUser) {
-      return res.status(400).json({ error: 'Admin has no active company' });
-    }
-
-    const companyId = adminUser.company_id;
+    const companyId = device.company_id;
 
     /* =========================
        VALIDATE ITEMS
@@ -101,23 +81,19 @@ router.post('/stock', async (req, res) => {
     ========================= */
     const { data: snapshot, error: snapErr } = await supabaseAdmin
       .from('stock_snapshots')
-      .insert({ company_id: companyId }) // status defaults to PENDING
+      .insert({ company_id: companyId })
       .select('snapshot_id')
       .single();
 
     if (snapErr || !snapshot) {
-      console.error(snapErr);
       return res.status(500).json({ error: 'Snapshot creation failed' });
     }
 
     /* =========================
-       3️⃣ MAP ITEM IDS (FIXED)
+       3️⃣ MAP ITEM IDS
     ========================= */
-
-    // collect only GUIDs from this payload
     const tallyGuids = items.map(i => i.tally_guid);
 
-    // fetch only required items
     const { data: dbItems, error: mapErr } = await supabaseAdmin
       .from('items')
       .select('item_id, tally_guid')
@@ -138,7 +114,6 @@ router.post('/stock', async (req, res) => {
       itemMap[row.tally_guid] = row.item_id;
     }
 
-    // validate mapping before insert
     for (const i of items) {
       if (!itemMap[i.tally_guid]) {
         await supabaseAdmin
@@ -166,8 +141,6 @@ router.post('/stock', async (req, res) => {
       .insert(rows);
 
     if (snapItemErr) {
-      console.error('SNAPSHOT ITEM INSERT ERROR:', snapItemErr);
-
       await supabaseAdmin
         .from('stock_snapshots')
         .update({ status: 'FAILED' })
