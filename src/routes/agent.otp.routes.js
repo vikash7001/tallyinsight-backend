@@ -6,7 +6,8 @@ const router = express.Router();
 
 // POST /agent/login/otp/request
 router.post('/login/otp/request', async (req, res) => {
-  const { email } = req.body;
+const email = req.body.email?.toLowerCase().trim();
+
 
   if (!email) {
     return res.status(400).json({ error: 'Email required' });
