@@ -8,20 +8,17 @@ import imageRoutes from './routes/image.routes.js';
 
 import { requireAuth } from './middleware/auth.js';
 import { licenseGuard } from './middleware/licenseGuard.js';
+
 import adminItemsExcelRoutes from './routes/admin.items.excel.routes.js';
 import adminDevicesRoutes from './routes/admin.devices.routes.js';
+
 import agentAuthRoutes from './routes/agent.auth.routes.js';
 import agentCompaniesRoutes from './routes/agent.companies.routes.js';
+import agentProvisionRoutes from './routes/agent.provision.routes.js';
+import agentStockRoutes from './routes/agent.stock.routes.js';
 
-
-
-// NEW admin header middleware
 import adminHeaderAuth from './middleware/adminHeaderAuth.js';
 import tdlStockRoutes from './routes/tdl.stock.routes.js';
-import agentStockRoutes from './routes/agent.stock.routes.js';
-import agentProvisionRoutes from './routes/agent.provision.routes.js';
-
-
 
 const app = express();
 
@@ -33,22 +30,26 @@ app.get('/health', (req, res) => {
   res.json({ ok: true });
 });
 
-// 🔓 Existing routes — UNCHANGED
+// 🔓 Public auth
 app.use('/auth', authRoutes);
+
+// 🔐 User-scoped routes
 app.use('/stock', requireAuth, licenseGuard, stockRoutes);
 app.use('/images', requireAuth, licenseGuard, imageRoutes);
 app.use('/items', requireAuth, licenseGuard, itemsRoutes);
 
-// 🔐 Admin scope — middleware only (NO routes yet)
+// 🔐 Admin routes (header based)
 app.use('/admin', adminHeaderAuth);
 app.use('/admin', adminItemsExcelRoutes);
 app.use('/admin', adminDevicesRoutes);
 
-// 🔐 TDL routes (no user auth)
+// 🔐 TDL routes (no auth)
 app.use('/tdl', tdlStockRoutes);
-app.use('/agent', agentStockRoutes);
-app.use('/agent', agentProvisionRoutes);
+
+// 🤖 Agent routes
 app.use('/agent', agentAuthRoutes);
 app.use('/agent', agentCompaniesRoutes);
+app.use('/agent', agentProvisionRoutes);
+app.use('/agent', agentStockRoutes);
 
 export default app;
