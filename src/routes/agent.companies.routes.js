@@ -4,33 +4,33 @@ import { supabaseAdmin } from '../config/supabase.js';
 const router = express.Router();
 
 router.get('/companies', async (req, res) => {
-  const user_id = req.header('x-user-id');
+  const deviceId = req.headers['x-device-id'];
+  const deviceToken = req.headers['x-device-token'];
 
-  if (!user_id) {
-    return res.status(400).json({ error: 'Missing user_id' });
+  if (!deviceId || !deviceToken) {
+    return res.status(401).json({ error: 'DEVICE_AUTH_REQUIRED' });
   }
 
-  const { data: user } = await supabaseAdmin
-    .from('app_users')
-    .select('admin_id')
-    .eq('user_id', user_id)
+  const { data: device, error } = await supabaseAdmin
+    .from('devices')
+    .select('company_id')
+    .eq('device_id', deviceId)
+    .eq('device_token', deviceToken)
+    .eq('revoked', false)
     .single();
 
-  const { data: companies } = await supabaseAdmin
+  if (error || !device) {
+    return res.status(401).json({ error: 'INVALID_DEVICE' });
+  }
+
+  const { data: company } = await supabaseAdmin
     .from('companies')
-    .select(`
-      company_id,
-      company_name,
-      subscriptions(status)
-    `)
-    .eq('admin_id', user.admin_id);
+    .select('company_id, company_name')
+    .eq('company_id', device.company_id)
+    .single();
 
   return res.json({
-    companies: companies.map(c => ({
-      company_id: c.company_id,
-      company_name: c.company_name,
-      status: c.subscriptions?.status
-    }))
+    companies: [company]
   });
 });
 

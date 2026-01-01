@@ -5,7 +5,9 @@ const router = express.Router();
 
 // POST /agent/login/otp/verify
 router.post('/login/otp/verify', async (req, res) => {
-  const { email, otp } = req.body;
+const email = req.body.email?.toLowerCase().trim();
+const otp = req.body.otp;
+
 
   if (!email || !otp) {
     return res.status(400).json({ error: 'Missing fields' });
