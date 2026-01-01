@@ -4,6 +4,10 @@ import { supabaseAdmin } from '../config/supabase.js';
 
 const router = express.Router();
 
+/**
+ * POST /agent/login/password
+ * Login via email OR mobile + password
+ */
 router.post('/login/password', async (req, res) => {
   const { identifier, password } = req.body;
 
@@ -11,27 +15,37 @@ router.post('/login/password', async (req, res) => {
     return res.status(400).json({ error: 'Missing credentials' });
   }
 
-  const emailIdentifier = identifier.toLowerCase();
+  // normalize email (mobile untouched)
+  const emailIdentifier = identifier.toLowerCase().trim();
 
-const { data: user, error } = await supabaseAdmin
-  .from('app_users')
-  .select('user_id, company_id, active, password_hash')
-  .or(`email.eq.${emailIdentifier},mobile.eq.${identifier}`)
-  .single();
+  const { data: user, error } = await supabaseAdmin
+    .from('app_users')
+    .select('user_id, company_id, active, password_hash')
+    .or(`email.eq.${emailIdentifier},mobile.eq.${identifier}`)
+    .single();
 
-if (error || !user || !user.active) {
-  return res.status(401).json({ error: 'Invalid login' });
-}
+  if (error) {
+    console.error('SUPABASE ERROR:', error);
+  }
 
-const ok = await bcrypt.compare(password, user.password_hash);
-if (!ok) {
-  return res.status(401).json({ error: 'Invalid login' });
-}
+  if (!user || !user.active) {
+    return res.status(401).json({ error: 'Invalid login' });
+  }
 
-return res.json({
-  user_id: user.user_id,
-  company_id: user.company_id
+  if (!user.password_hash) {
+    return res.status(401).json({ error: 'Password not set' });
+  }
+
+  const passwordOk = await bcrypt.compare(password, user.password_hash);
+  if (!passwordOk) {
+    return res.status(401).json({ error: 'Invalid login' });
+  }
+
+  // ✅ SUCCESS
+  return res.json({
+    user_id: user.user_id,
+    company_id: user.company_id
+  });
 });
-
 
 export default router;
