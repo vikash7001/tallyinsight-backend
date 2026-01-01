@@ -52,9 +52,8 @@ router.get('/companies', async (req, res) => {
     // 2️⃣ fetch companies
     const { data: companies, error: compErr } = await supabaseAdmin
 .from('companies')
-.select('company_id, name')
+.select('company_id, company_name')
 .in('company_id', companyIds);
-
 
     if (compErr) {
       console.error('COMPANIES ERROR:', compErr);
