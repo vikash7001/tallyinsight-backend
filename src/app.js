@@ -10,6 +10,10 @@ import { requireAuth } from './middleware/auth.js';
 import { licenseGuard } from './middleware/licenseGuard.js';
 import adminItemsExcelRoutes from './routes/admin.items.excel.routes.js';
 import adminDevicesRoutes from './routes/admin.devices.routes.js';
+import agentAuthRoutes from './routes/agent.auth.routes.js';
+import agentCompaniesRoutes from './routes/agent.companies.routes.js';
+
+
 
 // NEW admin header middleware
 import adminHeaderAuth from './middleware/adminHeaderAuth.js';
@@ -44,5 +48,7 @@ app.use('/admin', adminDevicesRoutes);
 app.use('/tdl', tdlStockRoutes);
 app.use('/agent', agentStockRoutes);
 app.use('/agent', agentProvisionRoutes);
+app.use('/agent', agentAuthRoutes);
+app.use('/agent', agentCompaniesRoutes);
 
 export default app;
