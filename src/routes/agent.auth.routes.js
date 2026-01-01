@@ -12,11 +12,12 @@ router.post('/login', async (req, res) => {
   }
 
   // 🔐 Mobile-based lookup (admin bootstrap supported)
-  const { data: user, error } = await supabaseAdmin
-    .from('app_users')
-    .select('user_id, admin_id, active, password')
-    .eq('mobile', identifier)
-    .single();
+const { data: user, error } = await supabaseAdmin
+  .from('app_users')
+  .select('user_id, admin_id, active, password')
+  .or(`mobile.eq.${identifier},mobile.eq.+91${identifier}`)
+  .single();
+
 
   if (error || !user || !user.active) {
     return res.status(401).json({ error: 'Invalid login' });
