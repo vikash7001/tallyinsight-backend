@@ -5,49 +5,60 @@ const router = express.Router();
 
 // POST /agent/login/otp/verify
 router.post('/login/otp/verify', async (req, res) => {
-const email = req.body.email?.toLowerCase().trim();
-const otp = req.body.otp;
+  try {
+    console.log('[agent/otp/verify] raw body:', req.body);
 
+    const identifierRaw = req.body.identifier;
+    const otp = req.body.otp;
 
-  if (!email || !otp) {
-    return res.status(400).json({ error: 'Missing fields' });
+    if (!identifierRaw || !otp) {
+      return res.status(400).json({ error: 'Missing fields' });
+    }
+
+    const identifier = identifierRaw.toLowerCase().trim();
+
+    const { data: user, error: userError } = await supabaseAdmin
+      .from('app_users')
+      .select('user_id, active, role, email, mobile')
+      .or(`email.eq.${identifier},mobile.eq.${identifier}`)
+      .single();
+
+    if (userError || !user || !user.active) {
+      console.error('[agent/otp/verify] invalid user:', identifier);
+      return res.status(401).json({ error: 'Invalid user' });
+    }
+
+    const { data: record, error: otpError } = await supabaseAdmin
+      .from('user_otps')
+      .select('otp_id')
+      .eq('user_id', user.user_id)
+      .eq('otp_code', otp)
+      .or('used.is.null,used.eq.false')
+      .gt('expires_at', new Date().toISOString())
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (otpError || !record) {
+      console.error('[agent/otp/verify] invalid or expired OTP');
+      return res.status(401).json({ error: 'Invalid or expired OTP' });
+    }
+
+    await supabaseAdmin
+      .from('user_otps')
+      .update({ used: true })
+      .eq('otp_id', record.otp_id);
+
+    console.log('[agent/otp/verify] success:', user.user_id);
+
+    return res.json({
+      user_id: user.user_id,
+      role: user.role
+    });
+  } catch (err) {
+    console.error('[agent/otp/verify] unexpected error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
   }
-
-  const { data: user } = await supabaseAdmin
-    .from('app_users')
-    .select('user_id, active, role')
-    .eq('email', email)
-    .single();
-
-  if (!user || !user.active) {
-    return res.status(401).json({ error: 'Invalid user' });
-  }
-
-const { data: record } = await supabaseAdmin
-  .from('user_otps')
-  .select('otp_id')
-  .eq('user_id', user.user_id)
-  .eq('otp_code', otp)
-  .or('used.is.null,used.eq.false')
-  .gt('expires_at', new Date().toISOString())
-  .order('created_at', { ascending: false })
-  .limit(1)
-  .single();
-
-
-  if (!record) {
-    return res.status(401).json({ error: 'Invalid or expired OTP' });
-  }
-
-  await supabaseAdmin
-    .from('user_otps')
-    .update({ used: true })
-    .eq('otp_id', record.otp_id);
-
-  return res.json({
-    user_id: user.user_id,
-role: user.role
-      });
 });
 
 export default router;

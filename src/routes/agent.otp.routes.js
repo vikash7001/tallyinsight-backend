@@ -1,22 +1,24 @@
 import express from 'express';
-import crypto from 'crypto';
 import { supabaseAdmin } from '../config/supabase.js';
 
 const router = express.Router();
 
 // POST /agent/login/otp/request
 router.post('/login/otp/request', async (req, res) => {
-const email = req.body.email?.toLowerCase().trim();
+  console.log('[agent/otp/request] raw body:', req.body);
 
+  const identifierRaw = req.body.identifier;
 
-  if (!email) {
-    return res.status(400).json({ error: 'Email required' });
+  if (!identifierRaw || typeof identifierRaw !== 'string') {
+    return res.status(400).json({ error: 'Identifier required' });
   }
+
+  const identifier = identifierRaw.toLowerCase().trim();
 
   const { data: user, error } = await supabaseAdmin
     .from('app_users')
-    .select('user_id, active')
-    .eq('email', email)
+    .select('user_id, email, mobile, active')
+    .or(`email.eq.${identifier},mobile.eq.${identifier}`)
     .single();
 
   if (error || !user || !user.active) {
@@ -33,8 +35,8 @@ const email = req.body.email?.toLowerCase().trim();
     expires_at: expires
   });
 
-  // TODO: send email (stub for now)
-  console.log('LOGIN OTP:', email, otp);
+  // TEMP: stub
+  console.log('[agent/otp/request] LOGIN OTP:', identifier, otp);
 
   return res.json({ ok: true });
 });
