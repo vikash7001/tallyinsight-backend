@@ -26,13 +26,14 @@ const { data: device, error: deviceErr } = await supabaseAdmin
   .eq('device_token', deviceToken)
   .single();
 
+if (deviceErr || !device) {
+  return res.status(403).json({ error: 'Invalid device' });
+}
+
 if (device.revoked) {
   return res.status(403).json({ error: 'DEVICE_REVOKED' });
 }
 
-    if (deviceErr || !device) {
-      return res.status(403).json({ error: 'Invalid device' });
-    }
 
     // 1️⃣ get company_ids from app_users
     const { data: links, error: linkErr } = await supabaseAdmin

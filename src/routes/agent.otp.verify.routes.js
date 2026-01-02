@@ -15,7 +15,7 @@ const otp = req.body.otp;
 
   const { data: user } = await supabaseAdmin
     .from('app_users')
-    .select('user_id, active')
+    .select('user_id, active, role')
     .eq('email', email)
     .single();
 
@@ -23,16 +23,17 @@ const otp = req.body.otp;
     return res.status(401).json({ error: 'Invalid user' });
   }
 
-  const { data: record } = await supabaseAdmin
-    .from('user_otps')
-    .select('otp_id')
-    .eq('user_id', user.user_id)
-    .eq('otp_code', otp)
-    .eq('used', false)
-    .gt('expires_at', new Date().toISOString())
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
+const { data: record } = await supabaseAdmin
+  .from('user_otps')
+  .select('otp_id')
+  .eq('user_id', user.user_id)
+  .eq('otp_code', otp)
+  .or('used.is.null,used.eq.false')
+  .gt('expires_at', new Date().toISOString())
+  .order('created_at', { ascending: false })
+  .limit(1)
+  .single();
+
 
   if (!record) {
     return res.status(401).json({ error: 'Invalid or expired OTP' });
@@ -45,8 +46,8 @@ const otp = req.body.otp;
 
   return res.json({
     user_id: user.user_id,
-    admin_id: user.admin_id
-  });
+role: user.role
+      });
 });
 
 export default router;
