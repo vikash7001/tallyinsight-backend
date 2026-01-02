@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import agentIdentifyRouter from './routes/agentIdentify.js';
 
 import itemsRoutes from './routes/items.routes.js';
 import authRoutes from './routes/auth.routes.js';
@@ -35,6 +36,7 @@ app.get('/health', (req, res) => {
 
 // 🔓 Public auth
 app.use('/auth', authRoutes);
+app.use('/agent', agentIdentifyRouter);
 
 // 🔐 User-scoped routes
 app.use('/stock', requireAuth, licenseGuard, stockRoutes);
