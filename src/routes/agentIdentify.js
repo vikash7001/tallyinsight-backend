@@ -52,7 +52,6 @@ const { data: user, error } = await supabaseAdmin
 
     return res.json({
       user_id: user.user_id,
-      name: user.name,
       role: user.role
     });
 
