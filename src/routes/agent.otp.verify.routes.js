@@ -51,10 +51,12 @@ router.post('/login/otp/verify', async (req, res) => {
 
     console.log('[agent/otp/verify] success:', user.user_id);
 
-    return res.json({
-      user_id: user.user_id,
-      role: user.role
-    });
+return res.json({
+  user_id: user.user_id,
+  role: user.role,
+  admin_token: crypto.randomUUID()
+});
+
   } catch (err) {
     console.error('[agent/otp/verify] unexpected error:', err);
     return res.status(500).json({ error: 'Internal server error' });
