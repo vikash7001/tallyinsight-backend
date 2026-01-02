@@ -3,14 +3,13 @@ import { supabaseAdmin } from '../config/supabase.js';
 
 const router = express.Router();
 
-/*
-  POST /agent/identify
-  Body: { identifier }
-*/
 router.post('/identify', async (req, res) => {
   try {
-    // 🔍 RAW BODY LOG (most important)
     console.log('[agent/identify] raw body:', req.body);
+    console.log(
+      '[agent/identify] SUPABASE_URL =',
+      process.env.SUPABASE_URL
+    );
 
     const identifierRaw = req.body?.identifier;
 
@@ -21,14 +20,16 @@ router.post('/identify', async (req, res) => {
 
     const identifier = identifierRaw.toLowerCase().trim();
 
-    console.log('[agent/identify] normalized identifier:', identifier);
+    console.log(
+      '[agent/identify] querying with identifier =',
+      JSON.stringify(identifier)
+    );
 
-const { data: user, error } = await supabaseAdmin
-  .from('app_users')
-  .select('user_id, role, active, email, mobile')
-  .or(`email.eq.${identifier},mobile.eq.${identifier}`)
-  .single();
-
+    const { data: user, error } = await supabaseAdmin
+      .from('app_users')
+      .select('user_id, role, active, email, mobile')
+      .or(`email.eq.${identifier},mobile.eq.${identifier}`)
+      .maybeSingle();
 
     if (error) {
       console.error('[agent/identify] supabase error:', error);
