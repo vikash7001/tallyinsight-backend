@@ -23,11 +23,12 @@ router.post('/identify', async (req, res) => {
 
     console.log('[agent/identify] normalized identifier:', identifier);
 
-    const { data: user, error } = await supabaseAdmin
-      .from('app_users')
-      .select('user_id, name, role, active, email, mobile')
-      .or(`email.eq.${identifier},mobile.eq.${identifier}`)
-      .single();
+const { data: user, error } = await supabaseAdmin
+  .from('app_users')
+  .select('user_id, role, active, email, mobile')
+  .or(`email.eq.${identifier},mobile.eq.${identifier}`)
+  .single();
+
 
     if (error) {
       console.error('[agent/identify] supabase error:', error);
