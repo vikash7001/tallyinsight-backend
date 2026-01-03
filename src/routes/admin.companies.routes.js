@@ -49,31 +49,24 @@ router.get('/companies', async (req, res) => {
       return res.json([]);
     }
 
-    /* =========================
-       3️⃣ FETCH COMPANY DETAILS
-    ========================= */
-    const { data: companies, error: compErr } = await supabaseAdmin
-      .from('companies')
-      .select('company_id, company_name, status')
-      .in('company_id', companyIds)
-      .eq('status', 'ACTIVE');
+/* =========================
+   3️⃣ FETCH COMPANY DETAILS
+========================= */
+const { data: companies, error: compErr } = await supabaseAdmin
+  .from('companies')
+  .select('company_id, company_name')
+  .in('company_id', companyIds);
 
-    if (compErr) {
-      console.error('COMPANIES ERROR:', compErr);
-      return res.status(500).json({ error: 'Company fetch failed' });
-    }
+if (compErr) {
+  console.error('COMPANIES ERROR:', compErr);
+  return res.status(500).json({ error: 'Company fetch failed' });
+}
 
-    return res.json(
-      companies.map(c => ({
-        company_id: c.company_id,
-        company_name: c.company_name
-      }))
-    );
-
-  } catch (err) {
-    console.error('ADMIN /companies ERROR:', err);
-    return res.status(500).json({ error: 'Admin companies failed' });
-  }
-});
+return res.json(
+  companies.map(c => ({
+    company_id: c.company_id,
+    company_name: c.company_name
+  }))
+);
 
 export default router;
