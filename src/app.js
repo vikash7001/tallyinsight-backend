@@ -34,7 +34,7 @@ app.use(express.json());
 app.get('/health', (req, res) => {
   res.json({ ok: true });
 });
-app.use('/admin', adminHeaderAuth, adminCompaniesRoutes);
+app.use('/admin', adminCompaniesRoutes);
 
 // 🔓 Public auth
 app.use('/auth', authRoutes);
