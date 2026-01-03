@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import agentIdentifyRouter from './routes/agentIdentify.js';
+import adminCompaniesRoutes from './routes/admin.companies.routes.js';
 
 import itemsRoutes from './routes/items.routes.js';
 import authRoutes from './routes/auth.routes.js';
@@ -33,6 +34,7 @@ app.use(express.json());
 app.get('/health', (req, res) => {
   res.json({ ok: true });
 });
+app.use('/admin', adminHeaderAuth, adminCompaniesRoutes);
 
 // 🔓 Public auth
 app.use('/auth', authRoutes);
