@@ -21,6 +21,7 @@ import agentOtpVerifyRoutes from './routes/agent.otp.verify.routes.js';
 import agentCompaniesRoutes from './routes/agent.companies.routes.js';
 import agentProvisionRoutes from './routes/agent.provision.routes.js';
 import agentStockRoutes from './routes/agent.stock.routes.js';
+import agentLedgerRoutes from './routes/agent.ledger.routes.js';
 
 import adminHeaderAuth from './middleware/adminHeaderAuth.js';
 import tdlStockRoutes from './routes/tdl.stock.routes.js';
@@ -64,7 +65,7 @@ app.use('/agent', agentOtpVerifyRoutes);
 app.use('/agent', agentCompaniesRoutes);
 app.use('/agent', agentProvisionRoutes);
 app.use('/agent', agentStockRoutes);
-app.use('/agent/ledger', ledgerRoutes);
+app.use('/agent', agentLedgerRoutes);
 
 
 export default app;
