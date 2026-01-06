@@ -64,6 +64,7 @@ app.use('/agent', agentOtpVerifyRoutes);
 app.use('/agent', agentCompaniesRoutes);
 app.use('/agent', agentProvisionRoutes);
 app.use('/agent', agentStockRoutes);
-app.use('/ledger', ledgerRoutes);
+app.use('/agent/ledger', ledgerRoutes);
+
 
 export default app;
