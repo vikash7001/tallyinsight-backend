@@ -9,6 +9,8 @@ const router = express.Router();
  * Upload ledger closing balance snapshot (Debtors / Creditors)
  */
 router.post('/upload', async (req, res) => {
+console.log('[ledger/upload] company_id =', req.company_id);
+
   try {
     if (!req.company_id) {
       return res.status(400).json({ error: 'Company not selected' });
