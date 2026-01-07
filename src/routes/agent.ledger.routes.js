@@ -10,24 +10,31 @@ const router = express.Router();
   Headers:
     x-device-id
     x-device-token
+
   Body:
     {
       rows: [
         {
-          ledger_name,
-          ledger_group,
-          closing_balance,
-          balance_type
+          ledger_name: string,
+          ledger_group: "Sundry Debtors" | "Sundry Creditors",
+          closing_balance: number,
+          balance_type: "DR" | "CR"
         }
       ]
     }
+
+  Semantics:
+  - Latest balance only
+  - Full replace (authoritative snapshot)
+  - Atomic (RPC-backed)
 */
+
 router.post('/ledger/upload', async (req, res) => {
   console.log('AGENT /ledger/upload HIT');
 
   try {
     /* =========================
-       DEVICE AUTH (SAME AS STOCK)
+       1️⃣ DEVICE AUTH
     ========================= */
     const deviceId = req.header('x-device-id');
     const deviceToken = req.header('x-device-token');
@@ -48,12 +55,10 @@ router.post('/ledger/upload', async (req, res) => {
     }
 
     if (!device.company_id) {
-      return res.status(400).json({
-        error: 'DEVICE_COMPANY_NOT_SET'
-      });
+      return res.status(400).json({ error: 'DEVICE_COMPANY_NOT_SET' });
     }
 
-    // update last seen
+    // update last seen (non-blocking)
     await supabaseAdmin
       .from('devices')
       .update({ last_seen: new Date().toISOString() })
@@ -62,53 +67,65 @@ router.post('/ledger/upload', async (req, res) => {
     const companyId = device.company_id;
 
     /* =========================
-       VALIDATE ROWS
+       2️⃣ VALIDATE INPUT ROWS
     ========================= */
     const rows = Array.isArray(req.body.rows) ? req.body.rows : [];
 
-    if (rows.length === 0) {
-      return res.status(400).json({ error: 'No ledger rows received' });
+    for (const r of rows) {
+      if (
+        !r ||
+        typeof r.ledger_name !== 'string' ||
+        !r.ledger_name.trim() ||
+        typeof r.closing_balance !== 'number' ||
+        isNaN(r.closing_balance) ||
+        r.closing_balance <= 0 ||
+        !['DR', 'CR'].includes(r.balance_type) ||
+        !['Sundry Debtors', 'Sundry Creditors'].includes(r.ledger_group)
+      ) {
+        return res.status(400).json({
+          error: 'INVALID_LEDGER_ROW',
+          row: r
+        });
+      }
     }
 
     /* =========================
-       1️⃣ CLEAR OLD SNAPSHOT
+       3️⃣ ATOMIC REPLACE (RPC)
     ========================= */
-    const { error: delErr } = await supabaseAdmin
-      .from('ledger_balance_snapshot')
-      .delete()
-      .eq('company_id', companyId);
+    const { error: rpcErr } = await supabaseAdmin.rpc(
+      'replace_ledger_snapshot',
+      {
+        p_company_id: companyId,
+        p_rows: rows.map(r => ({
+          ledger_name: r.ledger_name.trim(),
+          ledger_group: r.ledger_group,
+          closing_balance: r.closing_balance,
+          balance_type: r.balance_type
+        }))
+      }
+    );
 
-    if (delErr) {
-      return res.status(500).json({ error: 'Failed to clear old snapshot' });
+    if (rpcErr) {
+      console.error('LEDGER RPC ERROR:', rpcErr);
+      return res.status(500).json({
+        error: 'LEDGER_SNAPSHOT_REPLACE_FAILED'
+      });
     }
 
     /* =========================
-       2️⃣ INSERT NEW SNAPSHOT
+       4️⃣ SUCCESS
     ========================= */
-    const insertRows = rows.map(r => ({
-      company_id: companyId,
-      ledger_name: r.ledger_name,
-      ledger_group: r.ledger_group,
-      closing_balance: r.closing_balance,
-      balance_type: r.balance_type
-    }));
-
-    const { error: insErr } = await supabaseAdmin
-      .from('ledger_balance_snapshot')
-      .insert(insertRows);
-
-    if (insErr) {
-      return res.status(500).json({ error: 'Ledger snapshot insert failed' });
-    }
-
     return res.json({
       ok: true,
-      inserted: insertRows.length
+      company_id: companyId,
+      inserted: rows.length
     });
 
   } catch (err) {
     console.error('AGENT LEDGER ERROR:', err);
-    return res.status(500).json({ error: 'Agent ledger failed' });
+    return res.status(500).json({
+      error: 'AGENT_LEDGER_UPLOAD_FAILED'
+    });
   }
 });
 
