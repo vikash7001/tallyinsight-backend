@@ -1,5 +1,3 @@
-// routes/agent.ledger.routes.js
-
 import express from 'express';
 import { supabaseAdmin } from '../config/supabase.js';
 
@@ -7,6 +5,7 @@ const router = express.Router();
 
 /*
   POST /agent/ledger/upload
+
   Headers:
     x-device-id
     x-device-token
@@ -23,10 +22,10 @@ const router = express.Router();
       ]
     }
 
-  Semantics:
-  - Latest balance only
-  - Full replace (authoritative snapshot)
-  - Atomic (RPC-backed)
+  Semantics (v1):
+  - Latest snapshot only
+  - Overwrite per (company_id, ledger_group)
+  - Debtors & Creditors synced independently
 */
 
 router.post('/ledger/upload', async (req, res) => {
@@ -58,7 +57,7 @@ router.post('/ledger/upload', async (req, res) => {
       return res.status(400).json({ error: 'DEVICE_COMPANY_NOT_SET' });
     }
 
-    // update last seen (non-blocking)
+    // non-blocking heartbeat
     await supabaseAdmin
       .from('devices')
       .update({ last_seen: new Date().toISOString() })
@@ -67,9 +66,19 @@ router.post('/ledger/upload', async (req, res) => {
     const companyId = device.company_id;
 
     /* =========================
-       2️⃣ VALIDATE INPUT ROWS
+       2️⃣ VALIDATE INPUT
     ========================= */
     const rows = Array.isArray(req.body.rows) ? req.body.rows : [];
+
+    if (rows.length === 0) {
+      return res.status(400).json({ error: 'NO_LEDGER_ROWS' });
+    }
+
+    const ledgerGroup = rows[0].ledger_group;
+
+    if (!['Sundry Debtors', 'Sundry Creditors'].includes(ledgerGroup)) {
+      return res.status(400).json({ error: 'INVALID_LEDGER_GROUP' });
+    }
 
     for (const r of rows) {
       if (
@@ -80,7 +89,7 @@ router.post('/ledger/upload', async (req, res) => {
         isNaN(r.closing_balance) ||
         r.closing_balance <= 0 ||
         !['DR', 'CR'].includes(r.balance_type) ||
-        !['Sundry Debtors', 'Sundry Creditors'].includes(r.ledger_group)
+        r.ledger_group !== ledgerGroup
       ) {
         return res.status(400).json({
           error: 'INVALID_LEDGER_ROW',
@@ -90,35 +99,51 @@ router.post('/ledger/upload', async (req, res) => {
     }
 
     /* =========================
-       3️⃣ ATOMIC REPLACE (RPC)
+       3️⃣ DELETE OLD SNAPSHOT (GROUP ONLY)
     ========================= */
-    const { error: rpcErr } = await supabaseAdmin.rpc(
-      'replace_ledger_snapshot',
-      {
-        p_company_id: companyId,
-        p_rows: rows.map(r => ({
-          ledger_name: r.ledger_name.trim(),
-          ledger_group: r.ledger_group,
-          closing_balance: r.closing_balance,
-          balance_type: r.balance_type
-        }))
-      }
-    );
+    const { error: delErr } = await supabaseAdmin
+      .from('ledger_balance_snapshot')
+      .delete()
+      .eq('company_id', companyId)
+      .eq('ledger_group', ledgerGroup);
 
-    if (rpcErr) {
-      console.error('LEDGER RPC ERROR:', rpcErr);
+    if (delErr) {
+      console.error('LEDGER DELETE ERROR:', delErr);
       return res.status(500).json({
-        error: 'LEDGER_SNAPSHOT_REPLACE_FAILED'
+        error: 'LEDGER_SNAPSHOT_DELETE_FAILED'
       });
     }
 
     /* =========================
-       4️⃣ SUCCESS
+       4️⃣ INSERT NEW SNAPSHOT
+    ========================= */
+    const insertRows = rows.map(r => ({
+      company_id: companyId,
+      ledger_name: r.ledger_name.trim(),
+      ledger_group: r.ledger_group,
+      closing_balance: r.closing_balance,
+      balance_type: r.balance_type
+    }));
+
+    const { error: insErr } = await supabaseAdmin
+      .from('ledger_balance_snapshot')
+      .insert(insertRows);
+
+    if (insErr) {
+      console.error('LEDGER INSERT ERROR:', insErr);
+      return res.status(500).json({
+        error: 'LEDGER_SNAPSHOT_INSERT_FAILED'
+      });
+    }
+
+    /* =========================
+       5️⃣ SUCCESS
     ========================= */
     return res.json({
       ok: true,
       company_id: companyId,
-      inserted: rows.length
+      ledger_group: ledgerGroup,
+      inserted: insertRows.length
     });
 
   } catch (err) {
