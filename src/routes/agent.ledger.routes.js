@@ -5,31 +5,13 @@ const router = express.Router();
 
 /*
   POST /agent/ledger/upload
-
-  Headers:
-    x-device-id
-    x-device-token
-
-  Body:
-    {
-      rows: [
-        {
-          ledger_name: string,
-          ledger_group: "Sundry Debtors" | "Sundry Creditors",
-          closing_balance: number,
-          balance_type: "DR" | "CR"
-        }
-      ]
-    }
-
-  Semantics (v1):
-  - Latest snapshot only
-  - Overwrite per (company_id, ledger_group)
-  - Debtors & Creditors synced independently
 */
 
 router.post('/ledger/upload', async (req, res) => {
-  console.log('AGENT /ledger/upload HIT');
+  console.log('AGENT /ledger/upload HIT', {
+    deviceId: req.header('x-device-id'),
+    bodyCount: Array.isArray(req.body?.rows) ? req.body.rows.length : 0
+  });
 
   try {
     /* =========================
@@ -39,6 +21,7 @@ router.post('/ledger/upload', async (req, res) => {
     const deviceToken = req.header('x-device-token');
 
     if (!deviceId || !deviceToken) {
+      console.warn('AGENT /ledger AUTH FAIL: missing headers');
       return res.status(401).json({ error: 'Missing device credentials' });
     }
 
@@ -50,10 +33,12 @@ router.post('/ledger/upload', async (req, res) => {
       .single();
 
     if (deviceErr || !device) {
+      console.warn('AGENT /ledger AUTH FAIL: invalid device', deviceErr?.message);
       return res.status(401).json({ error: 'Invalid device' });
     }
 
     if (!device.company_id) {
+      console.warn('AGENT /ledger FAIL: device has no company');
       return res.status(400).json({ error: 'DEVICE_COMPANY_NOT_SET' });
     }
 
@@ -71,12 +56,14 @@ router.post('/ledger/upload', async (req, res) => {
     const rows = Array.isArray(req.body.rows) ? req.body.rows : [];
 
     if (rows.length === 0) {
+      console.warn('AGENT /ledger EMPTY PAYLOAD');
       return res.status(400).json({ error: 'NO_LEDGER_ROWS' });
     }
 
     const ledgerGroup = rows[0].ledger_group;
 
     if (!['Sundry Debtors', 'Sundry Creditors'].includes(ledgerGroup)) {
+      console.warn('AGENT /ledger INVALID GROUP:', ledgerGroup);
       return res.status(400).json({ error: 'INVALID_LEDGER_GROUP' });
     }
 
@@ -91,6 +78,7 @@ router.post('/ledger/upload', async (req, res) => {
         !['DR', 'CR'].includes(r.balance_type) ||
         r.ledger_group !== ledgerGroup
       ) {
+        console.warn('AGENT /ledger INVALID ROW:', r);
         return res.status(400).json({
           error: 'INVALID_LEDGER_ROW',
           row: r
@@ -99,8 +87,13 @@ router.post('/ledger/upload', async (req, res) => {
     }
 
     /* =========================
-       3️⃣ DELETE OLD SNAPSHOT (GROUP ONLY)
+       3️⃣ DELETE OLD SNAPSHOT
     ========================= */
+    console.log('AGENT /ledger DELETE SNAPSHOT', {
+      companyId,
+      ledgerGroup
+    });
+
     const { error: delErr } = await supabaseAdmin
       .from('ledger_balance_snapshot')
       .delete()
@@ -139,6 +132,12 @@ router.post('/ledger/upload', async (req, res) => {
     /* =========================
        5️⃣ SUCCESS
     ========================= */
+    console.log('AGENT /ledger INSERT OK', {
+      companyId,
+      ledgerGroup,
+      inserted: insertRows.length
+    });
+
     return res.json({
       ok: true,
       company_id: companyId,
