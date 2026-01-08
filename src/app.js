@@ -26,7 +26,8 @@ import agentLedgerRoutes from './routes/agent.ledger.routes.js';
 import adminHeaderAuth from './middleware/adminHeaderAuth.js';
 import tdlStockRoutes from './routes/tdl.stock.routes.js';
 import ledgerRoutes from './routes/ledger.route.js';
-import stockRoutes from './routes/stock.routes.js';
+import activeStockRoutes from './routes/stock.active.routes.js';
+
 
 
 
@@ -67,7 +68,7 @@ app.use('/agent', agentCompaniesRoutes);
 app.use('/agent', agentProvisionRoutes);
 app.use('/agent', agentStockRoutes);
 app.use('/agent', agentLedgerRoutes);
-app.use('/stock', stockRoutes);
+
 
 
 export default app;
