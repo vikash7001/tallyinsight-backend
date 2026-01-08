@@ -27,6 +27,7 @@ import adminHeaderAuth from './middleware/adminHeaderAuth.js';
 import tdlStockRoutes from './routes/tdl.stock.routes.js';
 import ledgerRoutes from './routes/ledger.route.js';
 import activeStockRoutes from './routes/stock.active.routes.js';
+import syncRoutes from './routes/sync.routes.js';
 
 
 
@@ -69,6 +70,7 @@ app.use('/agent', agentCompaniesRoutes);
 app.use('/agent', agentProvisionRoutes);
 app.use('/agent', agentStockRoutes);
 app.use('/agent', agentLedgerRoutes);
+app.use('/sync', requireAuth, licenseGuard, syncRoutes);
 
 
 
