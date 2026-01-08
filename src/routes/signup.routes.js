@@ -52,19 +52,21 @@ router.post('/otp/verify', async (req, res) => {
     return res.status(400).json({ error: 'Missing fields' });
   }
 
-  const { data: record } = await supabaseAdmin
-    .from('user_otps')
-    .select('otp_id')
-    .eq('user_id', signup_id)
-    .eq('otp_code', otp)
-    .eq('purpose', 'signup')
-    .or('used.is.null,used.eq.false')
-    .gt('expires_at', new Date().toISOString())
-    .single();
+const { data: record, error } = await supabaseAdmin
+  .from('user_otps')
+  .select('otp_id')
+  .eq('user_id', signup_id)
+  .eq('otp_code', otp)
+  .eq('purpose', 'signup')
+  .or('used.is.null,used.eq.false')
+  .gt('expires_at', new Date().toISOString())
+  .order('created_at', { ascending: false })
+  .limit(1)
+  .single();
 
-  if (!record) {
-    return res.status(401).json({ error: 'Invalid or expired OTP' });
-  }
+if (error || !record) {
+  return res.status(401).json({ error: 'Invalid or expired OTP' });
+}
 
   await supabaseAdmin.from('admins').insert({
     admin_id: signup_id,
