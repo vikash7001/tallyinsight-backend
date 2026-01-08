@@ -48,6 +48,7 @@ app.use('/agent', agentIdentifyRouter);
 
 // 🔐 User-scoped routes
 app.use('/stock', requireAuth, licenseGuard, stockRoutes);
+app.use('/stock', requireAuth, licenseGuard, activeStockRoutes);
 app.use('/images', requireAuth, licenseGuard, imageRoutes);
 app.use('/items', requireAuth, licenseGuard, itemsRoutes);
 
