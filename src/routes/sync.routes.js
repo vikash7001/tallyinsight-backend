@@ -12,9 +12,9 @@ router.get('/last', async (req, res) => {
 
     const { data, error } = await supabaseAdmin
       .from('stock_snapshots')
-      .select('created_at')
+      .select('uploaded_at')
       .eq('company_id', req.company_id)
-      .order('created_at', { ascending: false })
+      .order('uploaded_at', { ascending: false }) // ✅ FIX
       .limit(1)
       .maybeSingle();
 
@@ -24,7 +24,7 @@ router.get('/last', async (req, res) => {
     }
 
     return res.json({
-      last_sync_at: data ? data.created_at : null
+      last_sync_at: data ? data.uploaded_at : null
     });
   } catch (err) {
     console.error('LAST SYNC SERVER ERROR:', err);
