@@ -28,6 +28,9 @@ import tdlStockRoutes from './routes/tdl.stock.routes.js';
 import ledgerRoutes from './routes/ledger.route.js';
 import activeStockRoutes from './routes/stock.active.routes.js';
 import syncRoutes from './routes/sync.routes.js';
+import signupRoutes from './routes/signup.routes.js';
+
+
 
 
 
@@ -71,7 +74,7 @@ app.use('/agent', agentProvisionRoutes);
 app.use('/agent', agentStockRoutes);
 app.use('/agent', agentLedgerRoutes);
 app.use('/sync', requireAuth, licenseGuard, syncRoutes);
-
+app.use('/signup', signupRoutes);
 
 
 export default app;
