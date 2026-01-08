@@ -29,6 +29,9 @@ import ledgerRoutes from './routes/ledger.route.js';
 import activeStockRoutes from './routes/stock.active.routes.js';
 import syncRoutes from './routes/sync.routes.js';
 import signupRoutes from './routes/signup.routes.js';
+import companyRoutes from './routes/company.routes.js';
+
+
 
 
 
@@ -75,6 +78,6 @@ app.use('/agent', agentStockRoutes);
 app.use('/agent', agentLedgerRoutes);
 app.use('/sync', requireAuth, licenseGuard, syncRoutes);
 app.use('/signup', signupRoutes);
-
+app.use('/companies', companyRoutes);
 
 export default app;
