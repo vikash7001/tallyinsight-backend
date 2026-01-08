@@ -12,7 +12,7 @@ router.get('/', async (req, res) => {
 
     const { data, error } = await supabaseAdmin
       .from('items')
-      .select('item_code, item_name, image_url')
+      .select('item_id, item_code, item_name, image_url')
       .eq('company_id', req.company_id)
       .order('item_code');
 
