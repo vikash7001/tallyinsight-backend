@@ -104,31 +104,27 @@ router.post('/create', async (req, res) => {
     /* =========================
        6️⃣ CREATE SUBSCRIPTION
     ========================= */
-    const { error: subErr } = await supabaseAdmin
-      .from('subscriptions')
-      .insert({
-        company_id: companyId,
-        status: plan === 'trial' ? 'trial' : 'active',
-        trial_start: trialStart,
-        trial_end: trialEnd,
-        created_at: now
-      });
+/* =========================
+   6️⃣ CREATE SUBSCRIPTION
+========================= */
+const { error: subErr } = await supabaseAdmin
+  .from('subscriptions')
+  .insert({
+    company_id: companyId,
+    status: 'ACTIVE',   // ✅ valid enum
+    trial_start: plan === 'trial' ? trialStart : null,
+    trial_end: plan === 'trial' ? trialEnd : null
+  });
 
-    if (subErr) {
-      console.error('[subscription create]', subErr);
-      return res.status(500).json({ error: 'Subscription creation failed' });
-    }
+if (subErr) {
+  console.error('[subscription create]', subErr);
 
-    return res.json({
-      company_id: companyId,
-      plan,
-      trial_end: trialEnd
-    });
+  // rollback to avoid half-created company
+  await supabaseAdmin.from('admin_companies').delete().eq('company_id', companyId);
+  await supabaseAdmin.from('companies').delete().eq('company_id', companyId);
 
-  } catch (err) {
-    console.error('[companies/create]', err);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-});
+  return res.status(500).json({ error: 'Subscription creation failed' });
+}
+
 
 export default router;
