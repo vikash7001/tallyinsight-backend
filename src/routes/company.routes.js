@@ -24,31 +24,56 @@ router.post('/create', async (req, res) => {
       return res.status(400).json({ error: 'Invalid subscription plan' });
     }
 
-    // 1. Validate admin
-    const { data: admin } = await supabaseAdmin
+    /* =========================
+       1️⃣ VERIFY ADMIN
+    ========================= */
+    const { data: admin, error: adminErr } = await supabaseAdmin
       .from('admins')
       .select('admin_id')
       .eq('admin_id', adminId)
       .single();
 
-    if (!admin) {
+    if (adminErr || !admin) {
       return res.status(401).json({ error: 'Invalid admin' });
     }
 
+    /* =========================
+       2️⃣ DUPLICATE PREVENTION
+    ========================= */
+    const { data: existingLinks, error: linkErr } = await supabaseAdmin
+      .from('admin_companies')
+      .select('company_id')
+      .eq('admin_id', adminId);
+
+    if (linkErr) {
+      console.error('[company create link check]', linkErr);
+      return res.status(500).json({ error: 'Company check failed' });
+    }
+
+    if (existingLinks && existingLinks.length > 0) {
+      return res.status(409).json({
+        error: 'COMPANY_ALREADY_EXISTS'
+      });
+    }
+
+    /* =========================
+       3️⃣ PREPARE DATA
+    ========================= */
     const companyId = crypto.randomUUID();
     const now = new Date();
 
-    // trial dates (only if trial)
     let trialStart = null;
     let trialEnd = null;
 
     if (plan === 'trial') {
       trialStart = now;
       trialEnd = new Date(now);
-      trialEnd.setDate(trialEnd.getDate() + 14); // 14-day trial
+      trialEnd.setDate(trialEnd.getDate() + 14);
     }
 
-    // 2. Create company
+    /* =========================
+       4️⃣ CREATE COMPANY
+    ========================= */
     const { error: companyErr } = await supabaseAdmin
       .from('companies')
       .insert({
@@ -61,16 +86,25 @@ router.post('/create', async (req, res) => {
       return res.status(500).json({ error: 'Company creation failed' });
     }
 
-    // 3. Link admin ↔ company
-    await supabaseAdmin
+    /* =========================
+       5️⃣ LINK ADMIN ↔ COMPANY
+    ========================= */
+    const { error: linkInsertErr } = await supabaseAdmin
       .from('admin_companies')
       .insert({
         admin_id: adminId,
         company_id: companyId
       });
 
-    // 4. Create subscription row
-    await supabaseAdmin
+    if (linkInsertErr) {
+      console.error('[admin_companies insert]', linkInsertErr);
+      return res.status(500).json({ error: 'Company linking failed' });
+    }
+
+    /* =========================
+       6️⃣ CREATE SUBSCRIPTION
+    ========================= */
+    const { error: subErr } = await supabaseAdmin
       .from('subscriptions')
       .insert({
         company_id: companyId,
@@ -79,6 +113,11 @@ router.post('/create', async (req, res) => {
         trial_end: trialEnd,
         created_at: now
       });
+
+    if (subErr) {
+      console.error('[subscription create]', subErr);
+      return res.status(500).json({ error: 'Subscription creation failed' });
+    }
 
     return res.json({
       company_id: companyId,
