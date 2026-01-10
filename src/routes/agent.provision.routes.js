@@ -2,65 +2,43 @@ import express from 'express';
 import crypto from 'crypto';
 import { supabaseAdmin } from '../config/supabase.js';
 
-import {
-  STATES,
-  getState,
-  getStateData,
-  transition
-} from '../state.js';
-
 const router = express.Router();
 
 /*
   POST /agent/provision
-  Called once per (admin + company + device)
+  Called by AGENT after installer flow is complete
 */
 router.post('/provision', async (req, res) => {
   try {
-    /* =========================
-       STATE GUARD
-    ========================= */
-    if (getState() !== STATES.TALLY_COMPANY_SELECTED) {
-      return res.status(400).json({ error: 'INVALID_STATE' });
-    }
-
-    const { admin_id, company_id, tally_company_name } = getStateData();
+    const { admin_id, company_id, tally_company_name } = req.body;
 
     if (!admin_id || !company_id || !tally_company_name) {
-      return res.status(400).json({ error: 'MISSING_STATE_DATA' });
+      return res.status(400).json({ error: 'MISSING_FIELDS' });
     }
 
-    transition(STATES.CONFIRMED_MAPPING);
-
-    /* =========================
-       1️⃣ VALIDATE COMPANY
-    ========================= */
-    const { data: company, error: companyErr } = await supabaseAdmin
+    /* 1️⃣ Validate company */
+    const { data: company } = await supabaseAdmin
       .from('companies')
       .select('company_id, activated_at')
       .eq('company_id', company_id)
       .single();
 
-    if (companyErr || !company) {
+    if (!company) {
       return res.status(403).json({ error: 'INVALID_COMPANY' });
     }
 
-    /* =========================
-       2️⃣ VALIDATE SUBSCRIPTION
-    ========================= */
-    const { data: subscription, error: subErr } = await supabaseAdmin
+    /* 2️⃣ Validate subscription */
+    const { data: subscription } = await supabaseAdmin
       .from('subscriptions')
       .select('status')
       .eq('company_id', company_id)
       .single();
 
-    if (subErr || subscription?.status !== 'ACTIVE') {
+    if (subscription?.status !== 'ACTIVE') {
       return res.status(403).json({ error: 'SUBSCRIPTION_INACTIVE' });
     }
 
-    /* =========================
-       3️⃣ CHECK EXISTING DEVICE
-    ========================= */
+    /* 3️⃣ Existing device check */
     const { data: existingDevice } = await supabaseAdmin
       .from('devices')
       .select('device_id, device_token')
@@ -70,9 +48,6 @@ router.post('/provision', async (req, res) => {
       .maybeSingle();
 
     if (existingDevice) {
-      transition(STATES.PROVISIONED);
-      transition(STATES.EXIT_SUCCESS);
-
       return res.json({
         device_id: existingDevice.device_id,
         device_token: existingDevice.device_token,
@@ -80,12 +55,10 @@ router.post('/provision', async (req, res) => {
       });
     }
 
-    /* =========================
-       4️⃣ CREATE DEVICE
-    ========================= */
+    /* 4️⃣ Create device */
     const device_token = crypto.randomBytes(32).toString('hex');
 
-    const { data: device, error: deviceErr } = await supabaseAdmin
+    const { data: device } = await supabaseAdmin
       .from('devices')
       .insert({
         admin_id,
@@ -96,15 +69,7 @@ router.post('/provision', async (req, res) => {
       .select()
       .single();
 
-    if (deviceErr || !device) {
-      console.error('DEVICE CREATE ERROR:', deviceErr);
-      return res.status(500).json({ error: 'DEVICE_CREATE_FAILED' });
-    }
-
-    /* =========================
-       5️⃣ ENSURE ADMIN APP USER
-       (IDEMPOTENT)
-    ========================= */
+    /* 5️⃣ Ensure ADMIN app_user (idempotent) */
     const { data: adminUser } = await supabaseAdmin
       .from('app_users')
       .select('user_id')
@@ -113,15 +78,11 @@ router.post('/provision', async (req, res) => {
       .maybeSingle();
 
     if (!adminUser) {
-      const { data: admin, error: adminErr } = await supabaseAdmin
+      const { data: admin } = await supabaseAdmin
         .from('admins')
         .select('mobile')
         .eq('admin_id', admin_id)
         .single();
-
-      if (adminErr || !admin) {
-        return res.status(500).json({ error: 'ADMIN_NOT_FOUND' });
-      }
 
       await supabaseAdmin.from('app_users').insert({
         company_id,
@@ -131,21 +92,13 @@ router.post('/provision', async (req, res) => {
       });
     }
 
-    /* =========================
-       6️⃣ ACTIVATE COMPANY (SAFE)
-    ========================= */
+    /* 6️⃣ Activate company (safe) */
     if (!company.activated_at) {
       await supabaseAdmin
         .from('companies')
         .update({ activated_at: new Date().toISOString() })
         .eq('company_id', company_id);
     }
-
-    /* =========================
-       FINAL STATE + RESPONSE
-    ========================= */
-    transition(STATES.PROVISIONED);
-    transition(STATES.EXIT_SUCCESS);
 
     return res.json({
       device_id: device.device_id,
