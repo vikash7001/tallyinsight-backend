@@ -30,6 +30,8 @@ import activeStockRoutes from './routes/stock.active.routes.js';
 import syncRoutes from './routes/sync.routes.js';
 import signupRoutes from './routes/signup.routes.js';
 import companyRoutes from './routes/company.routes.js';
+import agentAdminOtpRequestRoutes from './agent.admin.otp.routes.js';
+import agentAdminOtpVerifyRoutes from './agent.admin.otp.verify.routes.js';
 
 
 
@@ -79,5 +81,7 @@ app.use('/agent', agentLedgerRoutes);
 app.use('/sync', requireAuth, licenseGuard, syncRoutes);
 app.use('/signup', signupRoutes);
 app.use('/companies', companyRoutes);
+app.use('/agent', agentAdminOtpRequestRoutes);
+app.use('/agent', agentAdminOtpVerifyRoutes);
 
 export default app;
