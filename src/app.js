@@ -30,8 +30,9 @@ import activeStockRoutes from './routes/stock.active.routes.js';
 import syncRoutes from './routes/sync.routes.js';
 import signupRoutes from './routes/signup.routes.js';
 import companyRoutes from './routes/company.routes.js';
-import agentAdminOtpRequestRoutes from './agent.admin.otp.routes.js';
-import agentAdminOtpVerifyRoutes from './agent.admin.otp.verify.routes.js';
+import agentAdminOtpRequestRoutes from './routes/agent.admin.otp.routes.js';
+import agentAdminOtpVerifyRoutes from './routes/agent.admin.otp.verify.routes.js';
+
 
 
 
