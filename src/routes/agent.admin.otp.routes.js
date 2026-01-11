@@ -1,3 +1,9 @@
+import express from 'express';
+import crypto from 'crypto';
+import { supabaseAdmin } from '../config/supabase.js';
+
+const router = express.Router();
+
 router.post('/admin/otp/request', async (req, res) => {
   try {
     const identifierRaw = req.body.identifier;
@@ -37,3 +43,5 @@ router.post('/admin/otp/request', async (req, res) => {
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+export default router;   // ✅ THIS WAS MISSING
