@@ -13,14 +13,16 @@ router.post('/admin/otp/request', async (req, res) => {
 
     const identifier = identifierRaw.toLowerCase().trim();
 
-    // 1️⃣ Find admin (schema-correct)
-    const { data: admin, error: adminErr } = await supabaseAdmin
-      .from('admins')
-      .select('admin_id, mobile, email')
-      .or(`mobile.eq.${identifier},email.eq.${identifier}`)
+    // 1️⃣ Find ADMIN user by mobile (CSV-aligned)
+    const { data: user, error: userErr } = await supabaseAdmin
+      .from('app_users')
+      .select('user_id, mobile, role, active')
+      .eq('mobile', identifier)
+      .eq('role', 'ADMIN')
+      .eq('active', true)
       .single();
 
-    if (adminErr || !admin) {
+    if (userErr || !user) {
       return res.status(401).json({ error: 'Invalid admin' });
     }
 
@@ -28,15 +30,15 @@ router.post('/admin/otp/request', async (req, res) => {
     const otp = String(Math.floor(100000 + Math.random() * 900000));
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
-    // 3️⃣ Insert OTP (WITH ERROR CHECK)
+    // 3️⃣ Insert OTP (FK-safe)
     const { error: otpErr } = await supabaseAdmin
       .from('user_otps')
       .insert({
-        user_id: admin.admin_id,
+        user_id: user.user_id,
         otp_code: otp,
         purpose: 'agent_install',
         expires_at: expiresAt,
-        used: false   // IMPORTANT
+        used: false
       });
 
     if (otpErr) {

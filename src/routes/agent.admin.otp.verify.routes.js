@@ -4,7 +4,7 @@ import { supabaseAdmin } from '../config/supabase.js';
 const router = express.Router();
 
 /*
-  POST /agent/admin/otp/verify
+  POST /admin/otp/verify
   Body:
   { identifier, otp }
 */
@@ -16,17 +16,18 @@ router.post('/admin/otp/verify', async (req, res) => {
       return res.status(400).json({ error: 'Missing fields' });
     }
 
-    const id = identifier.toLowerCase().trim();
+    const mobile = identifier.toLowerCase().trim();
 
-    // 1️⃣ Find admin (FIXED)
-const { data: admin, error: adminErr } = await supabaseAdmin
-  .from('admins')
-  .select('admin_id')
-  .or(`mobile.eq.${id},email.eq.${id}`)
-  .single();
+    // 1️⃣ Find ADMIN user by mobile (CSV + FK aligned)
+    const { data: user, error: userErr } = await supabaseAdmin
+      .from('app_users')
+      .select('user_id, role, active')
+      .eq('mobile', mobile)
+      .eq('role', 'ADMIN')
+      .eq('active', true)
+      .single();
 
-
-    if (adminErr || !admin) {
+    if (userErr || !user) {
       return res.status(401).json({ error: 'Invalid admin' });
     }
 
@@ -34,7 +35,7 @@ const { data: admin, error: adminErr } = await supabaseAdmin
     const { data: record, error: otpErr } = await supabaseAdmin
       .from('user_otps')
       .select('otp_id')
-      .eq('user_id', admin.admin_id)
+      .eq('user_id', user.user_id)
       .eq('otp_code', otp)
       .eq('purpose', 'agent_install')
       .or('used.is.null,used.eq.false')
@@ -47,15 +48,20 @@ const { data: admin, error: adminErr } = await supabaseAdmin
       return res.status(401).json({ error: 'Invalid or expired OTP' });
     }
 
-    // 3️⃣ Mark OTP used
-    await supabaseAdmin
+    // 3️⃣ Mark OTP as used
+    const { error: updateErr } = await supabaseAdmin
       .from('user_otps')
       .update({ used: true })
       .eq('otp_id', record.otp_id);
 
+    if (updateErr) {
+      console.error('[OTP UPDATE ERROR]', updateErr);
+      return res.status(500).json({ error: 'Failed to finalize OTP' });
+    }
+
     // ✅ SUCCESS
     return res.json({
-      admin_id: admin.admin_id
+      user_id: user.user_id
     });
 
   } catch (err) {
