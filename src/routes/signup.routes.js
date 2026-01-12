@@ -94,7 +94,7 @@ router.post('/otp/verify', async (req, res) => {
       .insert({
         admin_id: signup_id,
         mobile: signup.mobile,
-        name: signup.email
+        email: signup.email
       });
 
     if (adminErr) {
