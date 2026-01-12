@@ -10,7 +10,7 @@ const router = express.Router();
 router.post('/create', async (req, res) => {
   try {
     const adminId = req.headers['x-user-id'];
-    const { company_name, plan } = req.body;
+    const { company_name } = req.body;
 
     if (!adminId) {
       return res.status(401).json({ error: 'Missing admin identity' });
@@ -20,16 +20,12 @@ router.post('/create', async (req, res) => {
       return res.status(400).json({ error: 'Company name required' });
     }
 
-    if (!plan || !['trial', 'paid'].includes(plan)) {
-      return res.status(400).json({ error: 'Invalid subscription plan' });
-    }
-
     /* =========================
        1️⃣ VERIFY ADMIN
     ========================= */
     const { data: admin, error: adminErr } = await supabaseAdmin
       .from('admins')
-      .select('admin_id')
+      .select('admin_id, mobile, email')
       .eq('admin_id', adminId)
       .single();
 
@@ -51,25 +47,13 @@ router.post('/create', async (req, res) => {
     }
 
     if (existingLinks && existingLinks.length > 0) {
-      return res.status(409).json({
-        error: 'COMPANY_ALREADY_EXISTS'
-      });
+      return res.status(409).json({ error: 'COMPANY_ALREADY_EXISTS' });
     }
 
     /* =========================
        3️⃣ PREPARE DATA
     ========================= */
     const companyId = crypto.randomUUID();
-    const now = new Date();
-
-    let trialStart = null;
-    let trialEnd = null;
-
-    if (plan === 'trial') {
-      trialStart = now;
-      trialEnd = new Date(now);
-      trialEnd.setDate(trialEnd.getDate() + 14);
-    }
 
     /* =========================
        4️⃣ CREATE COMPANY
@@ -98,45 +82,43 @@ router.post('/create', async (req, res) => {
 
     if (linkInsertErr) {
       console.error('[admin_companies insert]', linkInsertErr);
-      return res.status(500).json({ error: 'Company linking failed' });
-    }
-
-    /* =========================
-       6️⃣ CREATE SUBSCRIPTION
-    ========================= */
-    const { error: subErr } = await supabaseAdmin
-      .from('subscriptions')
-      .insert({
-        company_id: companyId,
-        status: 'ACTIVE', // ✅ valid enum
-        trial_start: plan === 'trial' ? trialStart : null,
-        trial_end: plan === 'trial' ? trialEnd : null
-      });
-
-    if (subErr) {
-      console.error('[subscription create]', subErr);
-
-      // rollback to avoid half-created company
-      await supabaseAdmin
-        .from('admin_companies')
-        .delete()
-        .eq('company_id', companyId);
 
       await supabaseAdmin
         .from('companies')
         .delete()
         .eq('company_id', companyId);
 
-      return res.status(500).json({ error: 'Subscription creation failed' });
+      return res.status(500).json({ error: 'Company linking failed' });
+    }
+
+    /* =========================
+       6️⃣ CREATE OWNER APP USER
+    ========================= */
+    const { error: appUserErr } = await supabaseAdmin
+      .from('app_users')
+      .insert({
+        user_id: crypto.randomUUID(),
+        company_id: companyId,
+        mobile: admin.mobile,
+        email: admin.email,
+        role: 'OWNER',   // or ADMIN (must exist in enum)
+        active: true
+      });
+
+    if (appUserErr) {
+      console.error('[app_users insert]', appUserErr);
+
+      await supabaseAdmin.from('admin_companies').delete().eq('company_id', companyId);
+      await supabaseAdmin.from('companies').delete().eq('company_id', companyId);
+
+      return res.status(500).json({ error: 'App user creation failed' });
     }
 
     /* =========================
        7️⃣ SUCCESS
     ========================= */
     return res.json({
-      company_id: companyId,
-      plan,
-      trial_end: trialEnd
+      company_id: companyId
     });
 
   } catch (err) {

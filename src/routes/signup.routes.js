@@ -19,7 +19,7 @@ router.post('/otp/request', async (req, res) => {
       return res.status(400).json({ error: 'Invalid mobile number' });
     }
 
-    // Check if admin already exists
+    // Prevent duplicate admin signup
     const { data: existing } = await supabaseAdmin
       .from('admins')
       .select('admin_id')
@@ -40,7 +40,8 @@ router.post('/otp/request', async (req, res) => {
         mobile,
         email,
         otp_code: otp,
-        expires_at: expiresAt
+        expires_at: expiresAt,
+        used: false
       });
 
     if (error) {
@@ -88,11 +89,15 @@ router.post('/otp/verify', async (req, res) => {
 
     const signup = records[0];
 
-    // Create admin
+    /* =========================
+       CREATE ADMIN (PERMANENT ID)
+    ========================= */
+    const adminId = crypto.randomUUID();
+
     const { error: adminErr } = await supabaseAdmin
       .from('admins')
       .insert({
-        admin_id: signup_id,
+        admin_id: adminId,
         mobile: signup.mobile,
         email: signup.email
       });
@@ -102,14 +107,16 @@ router.post('/otp/verify', async (req, res) => {
       return res.status(500).json({ error: 'Admin creation failed' });
     }
 
-    // Mark OTP used
+    /* =========================
+       MARK OTP USED
+    ========================= */
     await supabaseAdmin
       .from('signup_otps')
       .update({ used: true })
       .eq('signup_id', signup_id);
 
     return res.json({
-      user_id: signup_id,
+      user_id: adminId,
       role: 'admin'
     });
 

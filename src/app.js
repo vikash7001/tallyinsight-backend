@@ -32,13 +32,8 @@ import signupRoutes from './routes/signup.routes.js';
 import companyRoutes from './routes/company.routes.js';
 import agentAdminOtpRequestRoutes from './routes/agent.admin.otp.routes.js';
 import agentAdminOtpVerifyRoutes from './routes/agent.admin.otp.verify.routes.js';
-
-
-
-
-
-
-
+import adminProfileRoutes from './routes/adminProfile.js';
+import subscriptionRoutes from './routes/subscriptions.js';
 
 
 const app = express();
@@ -84,5 +79,6 @@ app.use('/signup', signupRoutes);
 app.use('/companies', companyRoutes);
 app.use('/agent', agentAdminOtpRequestRoutes);
 app.use('/agent', agentAdminOtpVerifyRoutes);
-
+app.use('/admin', adminProfileRoutes);
+app.use('/subscriptions', subscriptionRoutes);
 export default app;
