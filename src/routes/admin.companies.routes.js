@@ -1,3 +1,8 @@
+import express from 'express';
+import { supabaseAdmin } from '../config/supabase.js';
+
+const router = express.Router();
+
 router.get('/companies', async (req, res) => {
   try {
     const adminId = req.header('x-admin-id');
@@ -29,7 +34,7 @@ router.get('/companies', async (req, res) => {
       return res.status(500).json({ error: 'Company fetch failed' });
     }
 
-    // 3️⃣ ALWAYS return array
+    // 3️⃣ Always return array
     return res.json(companies || []);
 
   } catch (err) {
@@ -37,3 +42,5 @@ router.get('/companies', async (req, res) => {
     return res.status(500).json({ error: 'Admin companies failed' });
   }
 });
+
+export default router;
