@@ -19,11 +19,12 @@ router.post('/admin/otp/verify', async (req, res) => {
     const id = identifier.toLowerCase().trim();
 
     // 1️⃣ Find admin (FIXED)
-    const { data: admin, error: adminErr } = await supabaseAdmin
-      .from('admins')
-      .select('admin_id')
-      .or(`mobile.eq.${id},name.eq.${id}`)
-      .single();
+const { data: admin, error: adminErr } = await supabaseAdmin
+  .from('admins')
+  .select('admin_id')
+  .or(`mobile.eq.${id},email.eq.${id}`)
+  .single();
+
 
     if (adminErr || !admin) {
       return res.status(401).json({ error: 'Invalid admin' });
