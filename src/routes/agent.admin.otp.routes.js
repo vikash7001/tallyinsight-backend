@@ -1,5 +1,4 @@
 import express from 'express';
-import crypto from 'crypto';
 import { supabaseAdmin } from '../config/supabase.js';
 
 const router = express.Router();
@@ -14,26 +13,36 @@ router.post('/admin/otp/request', async (req, res) => {
 
     const identifier = identifierRaw.toLowerCase().trim();
 
-const { data: admin, error } = await supabaseAdmin
-  .from('admins')
-  .select('admin_id, mobile, email')
-  .or(`mobile.eq.${identifier},email.eq.${identifier}`)
-  .single();
+    // 1️⃣ Find admin (schema-correct)
+    const { data: admin, error: adminErr } = await supabaseAdmin
+      .from('admins')
+      .select('admin_id, mobile, email')
+      .or(`mobile.eq.${identifier},email.eq.${identifier}`)
+      .single();
 
-
-    if (error || !admin) {
+    if (adminErr || !admin) {
       return res.status(401).json({ error: 'Invalid admin' });
     }
 
+    // 2️⃣ Generate OTP
     const otp = String(Math.floor(100000 + Math.random() * 900000));
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
-    await supabaseAdmin.from('user_otps').insert({
-      user_id: admin.admin_id,
-      otp_code: otp,
-      purpose: 'agent_install',
-      expires_at: expiresAt
-    });
+    // 3️⃣ Insert OTP (WITH ERROR CHECK)
+    const { error: otpErr } = await supabaseAdmin
+      .from('user_otps')
+      .insert({
+        user_id: admin.admin_id,
+        otp_code: otp,
+        purpose: 'agent_install',
+        expires_at: expiresAt,
+        used: false   // IMPORTANT
+      });
+
+    if (otpErr) {
+      console.error('[OTP INSERT ERROR]', otpErr);
+      return res.status(500).json({ error: 'Failed to store OTP' });
+    }
 
     console.log('[agent admin otp]', identifier, otp);
 
@@ -45,4 +54,4 @@ const { data: admin, error } = await supabaseAdmin
   }
 });
 
-export default router;   // ✅ THIS WAS MISSING
+export default router;
