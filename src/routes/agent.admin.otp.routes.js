@@ -14,11 +14,12 @@ router.post('/admin/otp/request', async (req, res) => {
 
     const identifier = identifierRaw.toLowerCase().trim();
 
-    const { data: admin, error } = await supabaseAdmin
-      .from('admins')
-      .select('admin_id, mobile, name')
-      .or(`mobile.eq.${identifier},name.eq.${identifier}`)
-      .single();
+const { data: admin, error } = await supabaseAdmin
+  .from('admins')
+  .select('admin_id, mobile, email')
+  .or(`mobile.eq.${identifier},email.eq.${identifier}`)
+  .single();
+
 
     if (error || !admin) {
       return res.status(401).json({ error: 'Invalid admin' });
