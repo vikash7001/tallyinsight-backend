@@ -7,7 +7,8 @@ const router = express.Router();
    POST /admin/profile
    Save admin personal/business details
 ===================================================== */
-router.post('/profile', async (req, res) => {
+router.post('/', async (req, res) => {
+
   try {
     const adminId = req.headers['x-user-id'];
     const { name, address, gst_number } = req.body;
