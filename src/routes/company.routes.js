@@ -101,7 +101,7 @@ router.post('/create', async (req, res) => {
         company_id: companyId,
         mobile: admin.mobile,
         email: admin.email,
-        role: 'OWNER',   // or ADMIN (must exist in enum)
+        role: 'ADMIN',   // or ADMIN (must exist in enum)
         active: true
       });
 
