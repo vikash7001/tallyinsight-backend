@@ -19,6 +19,7 @@ import syncRoutes from './routes/sync.routes.js';
 import adminCompaniesRoutes from './routes/admin.companies.routes.js';
 import adminItemsExcelRoutes from './routes/admin.items.excel.routes.js';
 import adminDevicesRoutes from './routes/admin.devices.routes.js';
+import adminInstallerCompaniesRoutes from './routes/admin.installer.companies.routes.js';
 
 import agentIdentifyRouter from './routes/agentIdentify.js';
 import agentAuthRoutes from './routes/agent.auth.routes.js';
@@ -86,6 +87,7 @@ app.use('/admin', adminHeaderAuth);           // 🔐 guard starts
 app.use('/admin', adminCompaniesRoutes);
 app.use('/admin', adminItemsExcelRoutes);
 app.use('/admin', adminDevicesRoutes);
+app.use('/admin', adminInstallerCompaniesRoutes);
 
 /* =====================================================
    🤖 AGENT ROUTES
