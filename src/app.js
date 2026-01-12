@@ -61,7 +61,8 @@ app.use('/items', requireAuth, licenseGuard, itemsRoutes);
 app.use('/admin', adminHeaderAuth);
 app.use('/admin', adminItemsExcelRoutes);
 app.use('/admin', adminDevicesRoutes);
-
+app.use('/admin', adminProfileRoutes);
+app.use('/subscriptions', subscriptionRoutes);
 // 🔐 TDL routes (no auth)
 app.use('/tdl', tdlStockRoutes);
 
@@ -79,6 +80,5 @@ app.use('/signup', signupRoutes);
 app.use('/companies', companyRoutes);
 app.use('/agent', agentAdminOtpRequestRoutes);
 app.use('/agent', agentAdminOtpVerifyRoutes);
-app.use('/admin', adminProfileRoutes);
-app.use('/subscriptions', subscriptionRoutes);
+
 export default app;
