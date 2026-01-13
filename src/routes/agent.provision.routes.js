@@ -18,13 +18,17 @@ const router = express.Router();
 router.post('/provision', async (req, res) => {
   try {
     /* =========================
-       DEBUG (KEEP THIS)
+       0️⃣ HARD DEBUG — DO NOT REMOVE
     ========================= */
+    console.log('================ PROVISION START ================');
     console.log('PROVISION PAYLOAD:', req.body);
+    console.log('SUPABASE URL:', supabaseAdmin?.rest?.url || 'UNKNOWN');
+    console.log('=================================================');
 
     const { user_id, company_id, tally_company_name } = req.body;
 
     if (!user_id || !company_id || !tally_company_name) {
+      console.log('❌ MISSING_FIELDS');
       return res.status(400).json({ error: 'MISSING_FIELDS' });
     }
 
@@ -37,7 +41,10 @@ router.post('/provision', async (req, res) => {
       .eq('company_id', company_id)
       .single();
 
+    console.log('COMPANY LOOKUP:', company, companyErr);
+
     if (companyErr || !company) {
+      console.log('❌ INVALID_COMPANY (company not found)');
       return res.status(403).json({ error: 'INVALID_COMPANY' });
     }
 
@@ -50,12 +57,24 @@ router.post('/provision', async (req, res) => {
       .eq('company_id', company_id)
       .single();
 
+    console.log('SUBSCRIPTION LOOKUP:', subscription, subErr);
+
     if (subErr || subscription?.status !== 'ACTIVE') {
+      console.log('❌ SUBSCRIPTION_INACTIVE');
       return res.status(403).json({ error: 'SUBSCRIPTION_INACTIVE' });
     }
 
     /* =========================
-       3️⃣ Validate ownership
+       3️⃣ FULL OWNERSHIP DUMP
+    ========================= */
+    const { data: allOwnership } = await supabaseAdmin
+      .from('user_companies')
+      .select('*');
+
+    console.log('ALL USER_COMPANIES:', allOwnership);
+
+    /* =========================
+       4️⃣ Validate ownership
     ========================= */
     const { data: ownership } = await supabaseAdmin
       .from('user_companies')
@@ -64,12 +83,15 @@ router.post('/provision', async (req, res) => {
       .eq('company_id', company_id)
       .maybeSingle();
 
+    console.log('OWNERSHIP MATCH:', ownership);
+
     if (!ownership) {
+      console.log('❌ INVALID_COMPANY (ownership missing)');
       return res.status(403).json({ error: 'INVALID_COMPANY' });
     }
 
     /* =========================
-       4️⃣ Existing device check
+       5️⃣ Existing device check
     ========================= */
     const { data: existingDevice } = await supabaseAdmin
       .from('devices')
@@ -79,7 +101,10 @@ router.post('/provision', async (req, res) => {
       .eq('revoked', false)
       .maybeSingle();
 
+    console.log('EXISTING DEVICE:', existingDevice);
+
     if (existingDevice) {
+      console.log('✅ DEVICE ALREADY EXISTS');
       return res.json({
         device_id: existingDevice.device_id,
         device_token: existingDevice.device_token,
@@ -88,7 +113,7 @@ router.post('/provision', async (req, res) => {
     }
 
     /* =========================
-       5️⃣ Create device
+       6️⃣ Create device
     ========================= */
     const device_token = crypto.randomBytes(32).toString('hex');
 
@@ -103,13 +128,15 @@ router.post('/provision', async (req, res) => {
       .select()
       .single();
 
+    console.log('DEVICE INSERT RESULT:', device, deviceErr);
+
     if (deviceErr) {
-      console.error('[DEVICE INSERT FAILED]', deviceErr);
+      console.log('❌ DEVICE_CREATE_FAILED');
       return res.status(500).json({ error: 'DEVICE_CREATE_FAILED' });
     }
 
     /* =========================
-       6️⃣ Activate company (safe)
+       7️⃣ Activate company (safe)
     ========================= */
     if (!company.activated_at) {
       await supabaseAdmin
@@ -118,9 +145,9 @@ router.post('/provision', async (req, res) => {
         .eq('company_id', company_id);
     }
 
-    /* =========================
-       7️⃣ SUCCESS
-    ========================= */
+    console.log('✅ PROVISION SUCCESS');
+    console.log('================ PROVISION END ==================');
+
     return res.json({
       device_id: device.device_id,
       device_token,
@@ -128,7 +155,7 @@ router.post('/provision', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('AGENT PROVISION ERROR:', err);
+    console.error('❌ AGENT PROVISION ERROR:', err);
     return res.status(500).json({ error: 'PROVISION_FAILED' });
   }
 });
