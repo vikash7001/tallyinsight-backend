@@ -17,15 +17,16 @@ router.get('/companies', async (req, res) => {
     }
 
     // 1️⃣ Fetch companies linked via admin_companies
-    const { data, error } = await supabaseAdmin
-      .from('admin_companies')
-      .select(`
-        company_id,
-        companies (
-          company_name
-        )
-      `)
-      .eq('admin_id', adminId);
+const { data, error } = await supabaseAdmin
+  .from('admin_companies')
+  .select(`
+    company_id,
+    companies!admin_companies_company_id_fkey (
+      company_name
+    )
+  `)
+  .eq('admin_id', adminId);
+
 
     if (error) {
       console.error('ADMIN_COMPANIES ERROR:', error);
