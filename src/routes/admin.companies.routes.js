@@ -5,50 +5,40 @@ const router = express.Router();
 
 /**
  * GET /admin/companies
- *
- * Rules:
- * - Admin identity comes from middleware (req.user_id)
- * - Do NOT re-validate role differently from OTP
- * - Do NOT rely on company_name matching
+ * Returns ONLY companies linked to this admin
  */
 router.get('/companies', async (req, res) => {
   try {
-    // 🔑 Admin identity injected by adminHeaderAuth
-    const adminId = req.user_id || req.header('x-admin-id');
+    // admin_id comes from header OR middleware
+    const adminId = req.header('x-admin-id') || req.user_id;
 
     if (!adminId) {
       return res.status(401).json({ error: 'ADMIN_AUTH_REQUIRED' });
     }
 
-    /* =========================
-       VERIFY ADMIN (MATCH OTP LOGIC)
-    ========================= */
-    const { data: admin, error: adminErr } = await supabaseAdmin
-      .from('app_users')
-      .select('user_id, role, active')
-      .eq('user_id', adminId)
-      .eq('active', true)
-      .single();
+    // 1️⃣ Fetch companies linked via admin_companies
+    const { data, error } = await supabaseAdmin
+      .from('admin_companies')
+      .select(`
+        company_id,
+        companies (
+          company_name
+        )
+      `)
+      .eq('admin_id', adminId);
 
-    if (adminErr || !admin || admin.role !== 'ADMIN') {
-      return res.status(403).json({ error: 'INVALID_ADMIN' });
-    }
-
-    /* =========================
-       FETCH कंपनies OWNED / MAPPED TO ADMIN
-       (TEMP: return all companies if mapping table not ready)
-    ========================= */
-    const { data: companies, error: compErr } = await supabaseAdmin
-      .from('companies')
-      .select('company_id, company_name')
-      .order('company_name', { ascending: true });
-
-    if (compErr) {
-      console.error('COMPANY FETCH ERROR:', compErr);
+    if (error) {
+      console.error('ADMIN_COMPANIES ERROR:', error);
       return res.status(500).json({ error: 'COMPANY_FETCH_FAILED' });
     }
 
-    return res.json(companies || []);
+    // 2️⃣ Normalize response
+    const companies = (data || []).map(row => ({
+      company_id: row.company_id,
+      company_name: row.companies.company_name
+    }));
+
+    return res.json(companies);
 
   } catch (err) {
     console.error('ADMIN /companies ERROR:', err);
