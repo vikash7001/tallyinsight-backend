@@ -1,155 +1,138 @@
 import express from 'express';
-import { supabaseAdmin } from '../config/supabase.js';
+import { pool } from '../db.js'; // adjust import if needed
 
 const router = express.Router();
 
-/*
-  POST /agent/ledger/upload
-*/
-
+/**
+ * POST /agent/ledger/upload
+ * Device-authenticated ledger snapshot upload
+ */
 router.post('/ledger/upload', async (req, res) => {
-  console.log('AGENT /ledger/upload HIT', {
-    deviceId: req.header('x-device-id'),
-    bodyCount: Array.isArray(req.body?.rows) ? req.body.rows.length : 0
-  });
-
   try {
-    /* =========================
-       1️⃣ DEVICE AUTH
-    ========================= */
-    const deviceId = req.header('x-device-id');
-    const deviceToken = req.header('x-device-token');
+    const deviceId = req.headers['x-device-id'];
+    const deviceToken = req.headers['x-device-token'];
 
     if (!deviceId || !deviceToken) {
-      console.warn('AGENT /ledger AUTH FAIL: missing headers');
-      return res.status(401).json({ error: 'Missing device credentials' });
+      return res.status(401).json({ error: 'Missing device headers' });
     }
 
-    const { data: device, error: deviceErr } = await supabaseAdmin
-      .from('devices')
-      .select('device_id, company_id')
-      .eq('device_id', deviceId)
-      .eq('device_token', deviceToken)
-      .single();
+    const { rows } = req.body;
 
-    if (deviceErr || !device) {
-      console.warn('AGENT /ledger AUTH FAIL: invalid device', deviceErr?.message);
-      return res.status(401).json({ error: 'Invalid device' });
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return res.status(400).json({ error: 'No ledger rows provided' });
     }
-
-    if (!device.company_id) {
-      console.warn('AGENT /ledger FAIL: device has no company');
-      return res.status(400).json({ error: 'DEVICE_COMPANY_NOT_SET' });
-    }
-
-    // non-blocking heartbeat
-    await supabaseAdmin
-      .from('devices')
-      .update({ last_seen: new Date().toISOString() })
-      .eq('device_id', deviceId);
-
-    const companyId = device.company_id;
 
     /* =========================
-       2️⃣ VALIDATE INPUT
+       RESOLVE DEVICE → COMPANY
     ========================= */
-    const rows = Array.isArray(req.body.rows) ? req.body.rows : [];
 
-    if (rows.length === 0) {
-      console.warn('AGENT /ledger EMPTY PAYLOAD');
-      return res.status(400).json({ error: 'NO_LEDGER_ROWS' });
+    const deviceRes = await pool.query(
+      `
+      SELECT id, company_id
+      FROM devices
+      WHERE id = $1
+        AND device_token = $2
+        AND revoked = false
+      `,
+      [deviceId, deviceToken]
+    );
+
+    if (deviceRes.rowCount === 0) {
+      return res.status(401).json({ error: 'Invalid or revoked device' });
     }
 
-    const ledgerGroup = rows[0].ledger_group;
+    const companyId = deviceRes.rows[0].company_id;
 
-    if (!['Sundry Debtors', 'Sundry Creditors'].includes(ledgerGroup)) {
-      console.warn('AGENT /ledger INVALID GROUP:', ledgerGroup);
-      return res.status(400).json({ error: 'INVALID_LEDGER_GROUP' });
-    }
+    /* =========================
+       VALIDATE & PREPARE ROWS
+    ========================= */
 
-    for (const r of rows) {
+    const validRows = [];
+
+    for (const row of rows) {
+      const {
+        ledger_name,
+        ledger_group,
+        closing_balance,
+        balance_type
+      } = row;
+
       if (
-        !r ||
-        typeof r.ledger_name !== 'string' ||
-        !r.ledger_name.trim() ||
-        typeof r.closing_balance !== 'number' ||
-        isNaN(r.closing_balance) ||
-        r.closing_balance <= 0 ||
-        !['DR', 'CR'].includes(r.balance_type) ||
-        r.ledger_group !== ledgerGroup
+        !ledger_name ||
+        !ledger_group ||
+        closing_balance === null ||
+        closing_balance === undefined ||
+        !balance_type
       ) {
-        console.warn('AGENT /ledger INVALID ROW:', r);
-        return res.status(400).json({
-          error: 'INVALID_LEDGER_ROW',
-          row: r
-        });
+        console.warn('AGENT /ledger INVALID ROW:', row);
+        continue;
       }
-    }
 
-    /* =========================
-       3️⃣ DELETE OLD SNAPSHOT
-    ========================= */
-    console.log('AGENT /ledger DELETE SNAPSHOT', {
-      companyId,
-      ledgerGroup
-    });
-
-    const { error: delErr } = await supabaseAdmin
-      .from('ledger_balance_snapshot')
-      .delete()
-      .eq('company_id', companyId)
-      .eq('ledger_group', ledgerGroup);
-
-    if (delErr) {
-      console.error('LEDGER DELETE ERROR:', delErr);
-      return res.status(500).json({
-        error: 'LEDGER_SNAPSHOT_DELETE_FAILED'
+      validRows.push({
+        company_id: companyId,
+        ledger_name,
+        ledger_group,
+        closing_balance,
+        balance_type
       });
     }
 
-    /* =========================
-       4️⃣ INSERT NEW SNAPSHOT
-    ========================= */
-    const insertRows = rows.map(r => ({
-      company_id: companyId,
-      ledger_name: r.ledger_name.trim(),
-      ledger_group: r.ledger_group,
-      closing_balance: r.closing_balance,
-      balance_type: r.balance_type
-    }));
-
-    const { error: insErr } = await supabaseAdmin
-      .from('ledger_balance_snapshot')
-      .insert(insertRows);
-
-    if (insErr) {
-      console.error('LEDGER INSERT ERROR:', insErr);
-      return res.status(500).json({
-        error: 'LEDGER_SNAPSHOT_INSERT_FAILED'
-      });
+    if (validRows.length === 0) {
+      return res
+        .status(200)
+        .json({ ok: true, inserted: 0, note: 'No valid rows' });
     }
 
     /* =========================
-       5️⃣ SUCCESS
+       SNAPSHOT INSERT
     ========================= */
-    console.log('AGENT /ledger INSERT OK', {
-      companyId,
-      ledgerGroup,
-      inserted: insertRows.length
-    });
+
+    const insertValues = [];
+    const params = [];
+
+    let idx = 1;
+    for (const r of validRows) {
+      insertValues.push(
+        `($${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++})`
+      );
+      params.push(
+        r.company_id,
+        r.ledger_name,
+        r.ledger_group,
+        r.closing_balance,
+        r.balance_type
+      );
+    }
+
+    await pool.query(
+      `
+      INSERT INTO ledger_balance_snapshot (
+        company_id,
+        ledger_name,
+        ledger_group,
+        closing_balance,
+        balance_type
+      )
+      VALUES ${insertValues.join(',')}
+      `,
+      params
+    );
+
+    console.log(
+      'AGENT /ledger/upload INSERTED',
+      validRows.length,
+      'rows for company',
+      companyId
+    );
 
     return res.json({
       ok: true,
-      company_id: companyId,
-      ledger_group: ledgerGroup,
-      inserted: insertRows.length
+      inserted: validRows.length
     });
 
   } catch (err) {
-    console.error('AGENT LEDGER ERROR:', err);
-    return res.status(500).json({
-      error: 'AGENT_LEDGER_UPLOAD_FAILED'
-    });
+    console.error('AGENT /ledger/upload ERROR', err);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
