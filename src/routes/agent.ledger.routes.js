@@ -1,12 +1,8 @@
 import express from 'express';
-import { pool } from '../db.js'; // ← UNCHANGED
+import { pool } from '../lib/db.js'; // ✅ FIXED PATH
 
 const router = express.Router();
 
-/**
- * POST /agent/ledger/upload
- * Device-authenticated ledger snapshot upload
- */
 router.post('/ledger/upload', async (req, res) => {
   try {
     const deviceId = req.headers['x-device-id'];
@@ -22,14 +18,9 @@ router.post('/ledger/upload', async (req, res) => {
       return res.status(400).json({ error: 'No ledger rows provided' });
     }
 
-    /* =========================
-       RESOLVE DEVICE → COMPANY
-       (ALREADY PRESENT LOGIC)
-    ========================= */
-
     const deviceRes = await pool.query(
       `
-      SELECT id, company_id
+      SELECT company_id
       FROM devices
       WHERE id = $1
         AND device_token = $2
@@ -44,11 +35,6 @@ router.post('/ledger/upload', async (req, res) => {
 
     const companyId = deviceRes.rows[0].company_id;
 
-    /* =========================
-       VALIDATE & PREPARE ROWS
-       (MINIMAL FIX HERE)
-    ========================= */
-
     const validRows = [];
 
     for (const row of rows) {
@@ -59,19 +45,16 @@ router.post('/ledger/upload', async (req, res) => {
         balance_type
       } = row;
 
-      // ❌ REMOVED: expecting row.company_id from agent
       if (
         !ledger_name ||
         !ledger_group ||
-        closing_balance === null ||
-        closing_balance === undefined ||
+        closing_balance == null ||
         !balance_type
       ) {
         console.warn('AGENT /ledger INVALID ROW:', row);
         continue;
       }
 
-      // ✅ ONLY ADDITION: inject company_id here
       validRows.push({
         company_id: companyId,
         ledger_name,
@@ -82,24 +65,15 @@ router.post('/ledger/upload', async (req, res) => {
     }
 
     if (validRows.length === 0) {
-      return res
-        .status(200)
-        .json({ ok: true, inserted: 0, note: 'No valid rows' });
+      return res.json({ ok: true, inserted: 0 });
     }
 
-    /* =========================
-       SNAPSHOT INSERT
-       (UNCHANGED)
-    ========================= */
-
-    const insertValues = [];
+    const values = [];
     const params = [];
+    let i = 1;
 
-    let idx = 1;
     for (const r of validRows) {
-      insertValues.push(
-        `($${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++})`
-      );
+      values.push(`($${i++}, $${i++}, $${i++}, $${i++}, $${i++})`);
       params.push(
         r.company_id,
         r.ledger_name,
@@ -118,26 +92,18 @@ router.post('/ledger/upload', async (req, res) => {
         closing_balance,
         balance_type
       )
-      VALUES ${insertValues.join(',')}
+      VALUES ${values.join(',')}
       `,
       params
     );
 
-    console.log(
-      'AGENT /ledger/upload INSERTED',
-      validRows.length,
-      'rows for company',
-      companyId
-    );
+    console.log('AGENT /ledger/upload INSERTED', validRows.length);
 
-    return res.json({
-      ok: true,
-      inserted: validRows.length
-    });
+    res.json({ ok: true, inserted: validRows.length });
 
   } catch (err) {
     console.error('AGENT /ledger/upload ERROR', err);
-    return res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
