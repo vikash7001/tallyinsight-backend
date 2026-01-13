@@ -3,47 +3,58 @@ import { supabaseAdmin } from '../config/supabase.js';
 
 const router = express.Router();
 
-/**
- * GET /admin/companies
- * Returns ONLY companies linked to this admin
- */
+/*
+  GET /admin/companies
+  Headers:
+    x-admin-id = app_users.user_id
+*/
 router.get('/companies', async (req, res) => {
   try {
-    // admin_id comes from header OR middleware
-    const adminId = req.header('x-admin-id') || req.user_id;
+    const userId = req.header('x-admin-id');
 
-    if (!adminId) {
+    if (!userId) {
       return res.status(401).json({ error: 'ADMIN_AUTH_REQUIRED' });
     }
 
-    // 1️⃣ Fetch companies linked via admin_companies
-const { data, error } = await supabaseAdmin
-  .from('admin_companies')
-  .select(`
-    company_id,
-    companies!admin_companies_company_id_fkey (
-      company_name
-    )
-  `)
-  .eq('admin_id', adminId);
+    // 1️⃣ Verify user exists & is ADMIN
+    const { data: user, error: userErr } = await supabaseAdmin
+      .from('app_users')
+      .select('user_id, role, active')
+      .eq('user_id', userId)
+      .eq('active', true)
+      .single();
 
+    if (userErr || !user || user.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'INVALID_ADMIN' });
+    }
+
+    // 2️⃣ Fetch companies via admin_companies (single source of truth)
+    const { data, error } = await supabaseAdmin
+      .from('admin_companies')
+      .select(`
+        company_id,
+        companies!admin_companies_company_id_fkey (
+          company_id,
+          company_name
+        )
+      `)
+      .eq('user_id', userId);
 
     if (error) {
       console.error('ADMIN_COMPANIES ERROR:', error);
-      return res.status(500).json({ error: 'COMPANY_FETCH_FAILED' });
+      return res.status(500).json({ error: 'Company fetch failed' });
     }
 
-    // 2️⃣ Normalize response
-    const companies = (data || []).map(row => ({
-      company_id: row.company_id,
-      company_name: row.companies.company_name
-    }));
+    // 3️⃣ Normalize response
+    const companies = (data || [])
+      .map(row => row.companies)
+      .filter(Boolean);
 
     return res.json(companies);
 
   } catch (err) {
     console.error('ADMIN /companies ERROR:', err);
-    return res.status(500).json({ error: 'ADMIN_COMPANIES_FAILED' });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
