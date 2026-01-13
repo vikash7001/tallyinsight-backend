@@ -58,10 +58,16 @@ app.get('/health', (req, res) => {
 });
 
 /* =====================================================
-   🔓 PUBLIC / ONBOARDING ROUTES (NO ADMIN GUARDS)
+   🔓 PUBLIC / AUTH (OTP — MUST BE FIRST)
+===================================================== */
+app.use(agentAdminOtpRequestRoutes);
+app.use(agentAdminOtpVerifyRoutes);
+
+/* =====================================================
+   🔓 PUBLIC / ONBOARDING
 ===================================================== */
 app.use('/signup', signupRoutes);
-app.use('/admin/profile', adminProfileRoutes);   // 👈 IMPORTANT
+app.use('/admin/profile', adminProfileRoutes);
 app.use('/companies', companyRoutes);
 app.use('/subscriptions', subscriptionRoutes);
 
@@ -72,7 +78,7 @@ app.use('/auth', authRoutes);
 app.use('/agent', agentIdentifyRouter);
 
 /* =====================================================
-   🔐 USER-SCOPED ROUTES (APP USERS)
+   🔐 USER-SCOPED ROUTES
 ===================================================== */
 app.use('/stock', requireAuth, licenseGuard, stockRoutes);
 app.use('/stock', requireAuth, licenseGuard, activeStockRoutes);
@@ -81,22 +87,20 @@ app.use('/items', requireAuth, licenseGuard, itemsRoutes);
 app.use('/sync', requireAuth, licenseGuard, syncRoutes);
 
 /* =====================================================
-   🔐 ADMIN ROUTES (HEADER-BASED — AFTER ONBOARDING)
+   🔐 ADMIN ROUTES (GUARD STARTS HERE)
 ===================================================== */
-app.use('/admin', adminHeaderAuth);           // 🔐 guard starts
+app.use('/admin', adminHeaderAuth);
 app.use('/admin', adminCompaniesRoutes);
 app.use('/admin', adminItemsExcelRoutes);
 app.use('/admin', adminDevicesRoutes);
 app.use('/admin', adminInstallerCompaniesRoutes);
 
 /* =====================================================
-   🤖 AGENT ROUTES
+   🤖 AGENT ROUTES (AUTHED)
 ===================================================== */
 app.use('/agent', agentAuthRoutes);
 app.use('/agent', agentOtpRoutes);
 app.use('/agent', agentOtpVerifyRoutes);
-app.use('/agent', agentAdminOtpRequestRoutes);
-app.use('/agent', agentAdminOtpVerifyRoutes);
 app.use('/agent', agentCompaniesRoutes);
 app.use('/agent', agentProvisionRoutes);
 app.use('/agent', agentStockRoutes);

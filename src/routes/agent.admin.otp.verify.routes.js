@@ -3,11 +3,14 @@ import { supabaseAdmin } from '../config/supabase.js';
 
 const router = express.Router();
 
-/*
-  POST /admin/otp/verify
-  Body:
-  { identifier, otp }
-*/
+/**
+ * ⚠️ IMPORTANT
+ * This route MUST remain PUBLIC.
+ * Do NOT attach admin auth middleware here.
+ *
+ * POST /admin/otp/verify
+ * Body: { identifier, otp }
+ */
 router.post('/admin/otp/verify', async (req, res) => {
   try {
     const { identifier, otp } = req.body;
@@ -16,9 +19,11 @@ router.post('/admin/otp/verify', async (req, res) => {
       return res.status(400).json({ error: 'Missing fields' });
     }
 
-    const mobile = identifier.toLowerCase().trim();
+    const mobile = identifier.trim();
 
-    // 1️⃣ Find ADMIN user by mobile (CSV + FK aligned)
+    /* =========================
+       FIND ADMIN USER
+    ========================= */
     const { data: user, error: userErr } = await supabaseAdmin
       .from('app_users')
       .select('user_id, role, active')
@@ -31,7 +36,9 @@ router.post('/admin/otp/verify', async (req, res) => {
       return res.status(401).json({ error: 'Invalid admin' });
     }
 
-    // 2️⃣ Verify OTP
+    /* =========================
+       VERIFY OTP
+    ========================= */
     const { data: record, error: otpErr } = await supabaseAdmin
       .from('user_otps')
       .select('otp_id')
@@ -48,7 +55,9 @@ router.post('/admin/otp/verify', async (req, res) => {
       return res.status(401).json({ error: 'Invalid or expired OTP' });
     }
 
-    // 3️⃣ Mark OTP as used
+    /* =========================
+       MARK OTP USED
+    ========================= */
     const { error: updateErr } = await supabaseAdmin
       .from('user_otps')
       .update({ used: true })
@@ -59,13 +68,15 @@ router.post('/admin/otp/verify', async (req, res) => {
       return res.status(500).json({ error: 'Failed to finalize OTP' });
     }
 
-    // ✅ SUCCESS
+    /* =========================
+       SUCCESS
+    ========================= */
     return res.json({
       user_id: user.user_id
     });
 
   } catch (err) {
-    console.error('[agent/admin/otp/verify]', err);
+    console.error('[admin/otp/verify]', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

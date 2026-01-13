@@ -3,6 +3,16 @@ import { supabaseAdmin } from '../config/supabase.js';
 
 const router = express.Router();
 
+/**
+ * ⚠️ IMPORTANT
+ * This route MUST remain PUBLIC.
+ * Do NOT attach admin auth middleware here.
+ */
+
+/**
+ * POST /admin/otp/request
+ * Admin-only OTP generation (no headers required)
+ */
 router.post('/admin/otp/request', async (req, res) => {
   try {
     const identifierRaw = req.body.identifier;
@@ -11,9 +21,11 @@ router.post('/admin/otp/request', async (req, res) => {
       return res.status(400).json({ error: 'Identifier required' });
     }
 
-    const identifier = identifierRaw.toLowerCase().trim();
+    const identifier = identifierRaw.trim();
 
-    // 1️⃣ Find ADMIN user by mobile (CSV-aligned)
+    /* =========================
+       FIND ADMIN USER
+    ========================= */
     const { data: user, error: userErr } = await supabaseAdmin
       .from('app_users')
       .select('user_id, mobile, role, active')
@@ -26,11 +38,15 @@ router.post('/admin/otp/request', async (req, res) => {
       return res.status(401).json({ error: 'Invalid admin' });
     }
 
-    // 2️⃣ Generate OTP
+    /* =========================
+       GENERATE OTP
+    ========================= */
     const otp = String(Math.floor(100000 + Math.random() * 900000));
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
-    // 3️⃣ Insert OTP (FK-safe)
+    /* =========================
+       STORE OTP
+    ========================= */
     const { error: otpErr } = await supabaseAdmin
       .from('user_otps')
       .insert({
@@ -46,12 +62,13 @@ router.post('/admin/otp/request', async (req, res) => {
       return res.status(500).json({ error: 'Failed to store OTP' });
     }
 
+    // TEMP: console until SMS gateway
     console.log('[agent admin otp]', identifier, otp);
 
     return res.json({ ok: true });
 
   } catch (err) {
-    console.error('[agent/admin/otp/request]', err);
+    console.error('[admin/otp/request]', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
