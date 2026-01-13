@@ -19,14 +19,15 @@ router.post('/otp/request', async (req, res) => {
       return res.status(400).json({ error: 'Invalid mobile number' });
     }
 
-    // Prevent duplicate admin signup
-    const { data: existing } = await supabaseAdmin
-      .from('admins')
-      .select('admin_id')
-      .eq('mobile', mobile);
+    // ❗ Check canonical identity table (NOT admins)
+    const { data: existingUser } = await supabaseAdmin
+      .from('app_users')
+      .select('user_id')
+      .eq('mobile', mobile)
+      .maybeSingle();
 
-    if (existing && existing.length > 0) {
-      return res.status(409).json({ error: 'Admin already exists' });
+    if (existingUser) {
+      return res.status(409).json({ error: 'User already exists' });
     }
 
     const signupId = crypto.randomUUID();
@@ -49,7 +50,7 @@ router.post('/otp/request', async (req, res) => {
       return res.status(500).json({ error: 'OTP insert failed' });
     }
 
-    // TEMP until SMS gateway
+    // TEMP: log OTP until SMS gateway
     console.log('[signup otp]', signupId, otp);
 
     return res.json({
@@ -90,21 +91,23 @@ router.post('/otp/verify', async (req, res) => {
     const signup = records[0];
 
     /* =========================
-       CREATE ADMIN (PERMANENT ID)
+       CREATE USER (CANONICAL)
     ========================= */
-    const adminId = crypto.randomUUID();
+    const userId = crypto.randomUUID();
 
-    const { error: adminErr } = await supabaseAdmin
-      .from('admins')
+    const { error: userErr } = await supabaseAdmin
+      .from('app_users')
       .insert({
-        admin_id: adminId,
+        user_id: userId,
         mobile: signup.mobile,
-        email: signup.email
+        email: signup.email,
+        role: 'ADMIN',
+        active: true
       });
 
-    if (adminErr) {
-      console.error('[signup admin insert failed]', adminErr);
-      return res.status(500).json({ error: 'Admin creation failed' });
+    if (userErr) {
+      console.error('[signup user insert failed]', userErr);
+      return res.status(500).json({ error: 'User creation failed' });
     }
 
     /* =========================
@@ -116,8 +119,8 @@ router.post('/otp/verify', async (req, res) => {
       .eq('signup_id', signup_id);
 
     return res.json({
-      user_id: adminId,
-      role: 'admin'
+      user_id: userId,
+      role: 'ADMIN'
     });
 
   } catch (err) {

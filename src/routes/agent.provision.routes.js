@@ -10,13 +10,15 @@ const router = express.Router();
 */
 router.post('/provision', async (req, res) => {
   try {
-    const { admin_id, company_id, tally_company_name } = req.body;
+    const { user_id, company_id, tally_company_name } = req.body;
 
-    if (!admin_id || !company_id || !tally_company_name) {
+    if (!user_id || !company_id || !tally_company_name) {
       return res.status(400).json({ error: 'MISSING_FIELDS' });
     }
 
-    /* 1️⃣ Validate company */
+    /* =========================
+       1️⃣ Validate company
+    ========================= */
     const { data: company } = await supabaseAdmin
       .from('companies')
       .select('company_id, activated_at')
@@ -27,7 +29,9 @@ router.post('/provision', async (req, res) => {
       return res.status(403).json({ error: 'INVALID_COMPANY' });
     }
 
-    /* 2️⃣ Validate subscription */
+    /* =========================
+       2️⃣ Validate subscription
+    ========================= */
     const { data: subscription } = await supabaseAdmin
       .from('subscriptions')
       .select('status')
@@ -38,12 +42,28 @@ router.post('/provision', async (req, res) => {
       return res.status(403).json({ error: 'SUBSCRIPTION_INACTIVE' });
     }
 
-    /* 3️⃣ Existing device check */
+    /* =========================
+       3️⃣ Validate ownership
+    ========================= */
+    const { data: ownership } = await supabaseAdmin
+      .from('user_companies')
+      .select('company_id')
+      .eq('user_id', user_id)
+      .eq('company_id', company_id)
+      .maybeSingle();
+
+    if (!ownership) {
+      return res.status(403).json({ error: 'INVALID_COMPANY' });
+    }
+
+    /* =========================
+       4️⃣ Existing device check
+    ========================= */
     const { data: existingDevice } = await supabaseAdmin
       .from('devices')
       .select('device_id, device_token')
       .eq('company_id', company_id)
-      .eq('admin_id', admin_id)
+      .eq('user_id', user_id)
       .eq('revoked', false)
       .maybeSingle();
 
@@ -55,13 +75,15 @@ router.post('/provision', async (req, res) => {
       });
     }
 
-    /* 4️⃣ Create device */
+    /* =========================
+       5️⃣ Create device
+    ========================= */
     const device_token = crypto.randomBytes(32).toString('hex');
 
-    const { data: device } = await supabaseAdmin
+    const { data: device, error: deviceErr } = await supabaseAdmin
       .from('devices')
       .insert({
-        admin_id,
+        user_id,
         company_id,
         tally_company_name,
         device_token
@@ -69,30 +91,14 @@ router.post('/provision', async (req, res) => {
       .select()
       .single();
 
-    /* 5️⃣ Ensure ADMIN app_user (idempotent) */
-    const { data: adminUser } = await supabaseAdmin
-      .from('app_users')
-      .select('user_id')
-      .eq('company_id', company_id)
-      .eq('role', 'ADMIN')
-      .maybeSingle();
-
-    if (!adminUser) {
-      const { data: admin } = await supabaseAdmin
-        .from('admins')
-        .select('mobile')
-        .eq('admin_id', admin_id)
-        .single();
-
-      await supabaseAdmin.from('app_users').insert({
-        company_id,
-        mobile: admin.mobile,
-        role: 'ADMIN',
-        active: true
-      });
+    if (deviceErr) {
+      console.error('[device insert failed]', deviceErr);
+      return res.status(500).json({ error: 'DEVICE_CREATE_FAILED' });
     }
 
-    /* 6️⃣ Activate company (safe) */
+    /* =========================
+       6️⃣ Activate company (safe)
+    ========================= */
     if (!company.activated_at) {
       await supabaseAdmin
         .from('companies')
