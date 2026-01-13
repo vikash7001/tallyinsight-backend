@@ -1,5 +1,5 @@
 import express from 'express';
-import { pool } from '../db.js'; // adjust import if needed
+import { pool } from '../db.js'; // ← UNCHANGED
 
 const router = express.Router();
 
@@ -24,6 +24,7 @@ router.post('/ledger/upload', async (req, res) => {
 
     /* =========================
        RESOLVE DEVICE → COMPANY
+       (ALREADY PRESENT LOGIC)
     ========================= */
 
     const deviceRes = await pool.query(
@@ -45,6 +46,7 @@ router.post('/ledger/upload', async (req, res) => {
 
     /* =========================
        VALIDATE & PREPARE ROWS
+       (MINIMAL FIX HERE)
     ========================= */
 
     const validRows = [];
@@ -57,6 +59,7 @@ router.post('/ledger/upload', async (req, res) => {
         balance_type
       } = row;
 
+      // ❌ REMOVED: expecting row.company_id from agent
       if (
         !ledger_name ||
         !ledger_group ||
@@ -68,6 +71,7 @@ router.post('/ledger/upload', async (req, res) => {
         continue;
       }
 
+      // ✅ ONLY ADDITION: inject company_id here
       validRows.push({
         company_id: companyId,
         ledger_name,
@@ -85,6 +89,7 @@ router.post('/ledger/upload', async (req, res) => {
 
     /* =========================
        SNAPSHOT INSERT
+       (UNCHANGED)
     ========================= */
 
     const insertValues = [];
