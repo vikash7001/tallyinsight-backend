@@ -7,9 +7,21 @@ const router = express.Router();
 /*
   POST /agent/provision
   Called by AGENT after installer flow is complete
+
+  Body:
+  {
+    user_id,
+    company_id,
+    tally_company_name
+  }
 */
 router.post('/provision', async (req, res) => {
   try {
+    /* =========================
+       DEBUG (KEEP THIS)
+    ========================= */
+    console.log('PROVISION PAYLOAD:', req.body);
+
     const { user_id, company_id, tally_company_name } = req.body;
 
     if (!user_id || !company_id || !tally_company_name) {
@@ -19,26 +31,26 @@ router.post('/provision', async (req, res) => {
     /* =========================
        1️⃣ Validate company
     ========================= */
-    const { data: company } = await supabaseAdmin
+    const { data: company, error: companyErr } = await supabaseAdmin
       .from('companies')
       .select('company_id, activated_at')
       .eq('company_id', company_id)
       .single();
 
-    if (!company) {
+    if (companyErr || !company) {
       return res.status(403).json({ error: 'INVALID_COMPANY' });
     }
 
     /* =========================
        2️⃣ Validate subscription
     ========================= */
-    const { data: subscription } = await supabaseAdmin
+    const { data: subscription, error: subErr } = await supabaseAdmin
       .from('subscriptions')
       .select('status')
       .eq('company_id', company_id)
       .single();
 
-    if (subscription?.status !== 'ACTIVE') {
+    if (subErr || subscription?.status !== 'ACTIVE') {
       return res.status(403).json({ error: 'SUBSCRIPTION_INACTIVE' });
     }
 
@@ -62,8 +74,8 @@ router.post('/provision', async (req, res) => {
     const { data: existingDevice } = await supabaseAdmin
       .from('devices')
       .select('device_id, device_token')
-      .eq('company_id', company_id)
       .eq('user_id', user_id)
+      .eq('company_id', company_id)
       .eq('revoked', false)
       .maybeSingle();
 
@@ -92,7 +104,7 @@ router.post('/provision', async (req, res) => {
       .single();
 
     if (deviceErr) {
-      console.error('[device insert failed]', deviceErr);
+      console.error('[DEVICE INSERT FAILED]', deviceErr);
       return res.status(500).json({ error: 'DEVICE_CREATE_FAILED' });
     }
 
@@ -106,6 +118,9 @@ router.post('/provision', async (req, res) => {
         .eq('company_id', company_id);
     }
 
+    /* =========================
+       7️⃣ SUCCESS
+    ========================= */
     return res.json({
       device_id: device.device_id,
       device_token,
