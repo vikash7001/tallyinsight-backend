@@ -1,5 +1,5 @@
 import express from 'express';
-import { pool } from '../lib/db.js'; // ✅ FIXED PATH
+import { supabaseAdmin } from '../config/supabase.js';
 
 const router = express.Router();
 
