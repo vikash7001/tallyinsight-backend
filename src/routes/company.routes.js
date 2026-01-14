@@ -60,8 +60,8 @@ router.post('/create', async (req, res) => {
       .from('user_companies')   // ✅ CORRECT TABLE
       .insert({
         user_id: userId,
-        company_id: companyId,
-        role: 'OWNER'
+        company_id: companyId
+        
       });
 
     if (linkErr) {
