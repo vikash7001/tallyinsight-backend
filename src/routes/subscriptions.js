@@ -24,7 +24,7 @@ router.post('/create', async (req, res) => {
        VERIFY USER ↔ COMPANY LINK
     ========================= */
     const { data: link, error: linkErr } = await supabaseAdmin
-      .from('user_company')
+      .from('user_companies')   // ✅ FIXED
       .select('company_id')
       .eq('user_id', userId)
       .eq('company_id', companyId)
@@ -36,7 +36,6 @@ router.post('/create', async (req, res) => {
 
     /* =========================
        DUPLICATE PREVENTION
-       (UNCHANGED)
     ========================= */
     const { data: existing } = await supabaseAdmin
       .from('subscriptions')
@@ -50,7 +49,6 @@ router.post('/create', async (req, res) => {
 
     /* =========================
        PREPARE DATES
-       (UNCHANGED)
     ========================= */
     let trialStart = null;
     let trialEnd = null;
@@ -63,7 +61,6 @@ router.post('/create', async (req, res) => {
 
     /* =========================
        CREATE SUBSCRIPTION
-       (UNCHANGED)
     ========================= */
     const { error: subErr } = await supabaseAdmin
       .from('subscriptions')
