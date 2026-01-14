@@ -25,7 +25,6 @@ router.post('/create', async (req, res) => {
 
     /* =========================
        VERIFY USER EXISTS
-       (NO ROLE ASSUMPTIONS)
     ========================= */
     const { data: user, error: userErr } = await supabaseAdmin
       .from('app_users')
@@ -56,10 +55,9 @@ router.post('/create', async (req, res) => {
 
     /* =========================
        LINK USER ↔ COMPANY
-       (NO LIMITS, NO CHECKS)
     ========================= */
     const { error: linkErr } = await supabaseAdmin
-      .from('companies')
+      .from('user_companies')   // ✅ CORRECT TABLE
       .insert({
         user_id: userId,
         company_id: companyId,
@@ -67,7 +65,7 @@ router.post('/create', async (req, res) => {
       });
 
     if (linkErr) {
-      console.error('[user_company insert]', linkErr);
+      console.error('[user_companies insert]', linkErr);
 
       // rollback company
       await supabaseAdmin
