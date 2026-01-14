@@ -5,7 +5,6 @@ const router = express.Router();
 
 /* =====================================================
    POST /admin/profile
-   Save admin personal/business details
 ===================================================== */
 router.post('/', async (req, res) => {
   try {
@@ -21,15 +20,20 @@ router.post('/', async (req, res) => {
     }
 
     /* =========================
-       VERIFY USER IS ADMIN
+       VERIFY ADMIN (REAL TABLE)
     ========================= */
     const { data: user, error: userErr } = await supabaseAdmin
-      .from('users')
-      .select('user_id, role')
+      .from('app_users')
+      .select('user_id, role, active')
       .eq('user_id', userId)
       .single();
 
-    if (userErr || !user || user.role !== 'admin') {
+    if (
+      userErr ||
+      !user ||
+      user.active !== true ||
+      user.role !== 'ADMIN'
+    ) {
       return res.status(401).json({ error: 'Unauthorized user' });
     }
 
