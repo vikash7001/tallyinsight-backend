@@ -59,7 +59,7 @@ router.post('/create', async (req, res) => {
        (NO LIMITS, NO CHECKS)
     ========================= */
     const { error: linkErr } = await supabaseAdmin
-      .from('user_company')
+      .from('companies')
       .insert({
         user_id: userId,
         company_id: companyId,
