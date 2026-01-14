@@ -8,13 +8,12 @@ const router = express.Router();
    Save admin personal/business details
 ===================================================== */
 router.post('/', async (req, res) => {
-
   try {
-    const adminId = req.headers['x-user-id'];
+    const userId = req.headers['x-user-id'];
     const { name, address, gst_number } = req.body;
 
-    if (!adminId) {
-      return res.status(401).json({ error: 'Missing admin identity' });
+    if (!userId) {
+      return res.status(401).json({ error: 'Missing user identity' });
     }
 
     if (!name || !name.trim()) {
@@ -22,25 +21,25 @@ router.post('/', async (req, res) => {
     }
 
     /* =========================
-       VERIFY ADMIN EXISTS
+       VERIFY USER IS ADMIN
     ========================= */
-    const { data: admin, error: adminErr } = await supabaseAdmin
-      .from('admins')
-      .select('admin_id')
-      .eq('admin_id', adminId)
+    const { data: user, error: userErr } = await supabaseAdmin
+      .from('users')
+      .select('user_id, role')
+      .eq('user_id', userId)
       .single();
 
-    if (adminErr || !admin) {
-      return res.status(401).json({ error: 'Invalid admin' });
+    if (userErr || !user || user.role !== 'admin') {
+      return res.status(401).json({ error: 'Unauthorized user' });
     }
 
     /* =========================
-       UPSERT PROFILE
+       UPSERT ADMIN PROFILE
     ========================= */
     const { error: profileErr } = await supabaseAdmin
       .from('admin_profiles')
       .upsert({
-        admin_id: adminId,
+        user_id: userId,
         name: name.trim(),
         address: address || null,
         gst_number: gst_number || null
