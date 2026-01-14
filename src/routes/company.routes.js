@@ -9,11 +9,14 @@ const router = express.Router();
 ===================================================== */
 router.post('/create', async (req, res) => {
   try {
-    const adminId = req.headers['x-user-id'];
+    const userId = req.headers['x-user-id'];
     const { company_name } = req.body;
 
-    if (!adminId) {
-      return res.status(401).json({ error: 'Missing admin identity' });
+    /* =========================
+       BASIC VALIDATION
+    ========================= */
+    if (!userId) {
+      return res.status(401).json({ error: 'Missing user identity' });
     }
 
     if (!company_name || !company_name.trim()) {
@@ -21,43 +24,24 @@ router.post('/create', async (req, res) => {
     }
 
     /* =========================
-       1️⃣ VERIFY ADMIN
+       VERIFY USER EXISTS
+       (NO ROLE ASSUMPTIONS)
     ========================= */
-    const { data: admin, error: adminErr } = await supabaseAdmin
-      .from('admins')
-      .select('admin_id, mobile, email')
-      .eq('admin_id', adminId)
+    const { data: user, error: userErr } = await supabaseAdmin
+      .from('app_users')
+      .select('user_id')
+      .eq('user_id', userId)
       .single();
 
-    if (adminErr || !admin) {
-      return res.status(401).json({ error: 'Invalid admin' });
+    if (userErr || !user) {
+      return res.status(401).json({ error: 'Invalid user' });
     }
 
     /* =========================
-       2️⃣ DUPLICATE PREVENTION
-    ========================= */
-    const { data: existingLinks, error: linkErr } = await supabaseAdmin
-      .from('admin_companies')
-      .select('company_id')
-      .eq('admin_id', adminId);
-
-    if (linkErr) {
-      console.error('[company create link check]', linkErr);
-      return res.status(500).json({ error: 'Company check failed' });
-    }
-
-    if (existingLinks && existingLinks.length > 0) {
-      return res.status(409).json({ error: 'COMPANY_ALREADY_EXISTS' });
-    }
-
-    /* =========================
-       3️⃣ PREPARE DATA
+       CREATE COMPANY
     ========================= */
     const companyId = crypto.randomUUID();
 
-    /* =========================
-       4️⃣ CREATE COMPANY
-    ========================= */
     const { error: companyErr } = await supabaseAdmin
       .from('companies')
       .insert({
@@ -71,18 +55,21 @@ router.post('/create', async (req, res) => {
     }
 
     /* =========================
-       5️⃣ LINK ADMIN ↔ COMPANY
+       LINK USER ↔ COMPANY
+       (NO LIMITS, NO CHECKS)
     ========================= */
-    const { error: linkInsertErr } = await supabaseAdmin
-      .from('admin_companies')
+    const { error: linkErr } = await supabaseAdmin
+      .from('user_company')
       .insert({
-        admin_id: adminId,
-        company_id: companyId
+        user_id: userId,
+        company_id: companyId,
+        role: 'OWNER'
       });
 
-    if (linkInsertErr) {
-      console.error('[admin_companies insert]', linkInsertErr);
+    if (linkErr) {
+      console.error('[user_company insert]', linkErr);
 
+      // rollback company
       await supabaseAdmin
         .from('companies')
         .delete()
@@ -92,30 +79,7 @@ router.post('/create', async (req, res) => {
     }
 
     /* =========================
-       6️⃣ CREATE OWNER APP USER
-    ========================= */
-    const { error: appUserErr } = await supabaseAdmin
-      .from('app_users')
-      .insert({
-        user_id: crypto.randomUUID(),
-        company_id: companyId,
-        mobile: admin.mobile,
-        email: admin.email,
-        role: 'ADMIN',   // or ADMIN (must exist in enum)
-        active: true
-      });
-
-    if (appUserErr) {
-      console.error('[app_users insert]', appUserErr);
-
-      await supabaseAdmin.from('admin_companies').delete().eq('company_id', companyId);
-      await supabaseAdmin.from('companies').delete().eq('company_id', companyId);
-
-      return res.status(500).json({ error: 'App user creation failed' });
-    }
-
-    /* =========================
-       7️⃣ SUCCESS
+       SUCCESS
     ========================= */
     return res.json({
       company_id: companyId

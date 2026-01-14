@@ -8,11 +8,11 @@ const router = express.Router();
 ===================================================== */
 router.post('/create', async (req, res) => {
   try {
-    const adminId = req.headers['x-user-id'];
+    const userId = req.headers['x-user-id'];
     const companyId = req.headers['x-company-id'];
     const { plan } = req.body;
 
-    if (!adminId || !companyId) {
+    if (!userId || !companyId) {
       return res.status(401).json({ error: 'Missing identity' });
     }
 
@@ -21,12 +21,12 @@ router.post('/create', async (req, res) => {
     }
 
     /* =========================
-       VERIFY COMPANY OWNERSHIP
+       VERIFY USER ↔ COMPANY LINK
     ========================= */
     const { data: link, error: linkErr } = await supabaseAdmin
-      .from('admin_companies')
+      .from('user_company')
       .select('company_id')
-      .eq('admin_id', adminId)
+      .eq('user_id', userId)
       .eq('company_id', companyId)
       .single();
 
@@ -36,6 +36,7 @@ router.post('/create', async (req, res) => {
 
     /* =========================
        DUPLICATE PREVENTION
+       (UNCHANGED)
     ========================= */
     const { data: existing } = await supabaseAdmin
       .from('subscriptions')
@@ -49,6 +50,7 @@ router.post('/create', async (req, res) => {
 
     /* =========================
        PREPARE DATES
+       (UNCHANGED)
     ========================= */
     let trialStart = null;
     let trialEnd = null;
@@ -61,12 +63,13 @@ router.post('/create', async (req, res) => {
 
     /* =========================
        CREATE SUBSCRIPTION
+       (UNCHANGED)
     ========================= */
     const { error: subErr } = await supabaseAdmin
       .from('subscriptions')
       .insert({
         company_id: companyId,
-        status: 'ACTIVE',     // enum
+        status: 'ACTIVE',
         trial_start: trialStart,
         trial_end: trialEnd
       });

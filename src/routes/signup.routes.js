@@ -6,6 +6,7 @@ const router = express.Router();
 
 /* =====================================================
    POST /signup/otp/request
+   (UNCHANGED)
 ===================================================== */
 router.post('/otp/request', async (req, res) => {
   try {
@@ -19,7 +20,7 @@ router.post('/otp/request', async (req, res) => {
       return res.status(400).json({ error: 'Invalid mobile number' });
     }
 
-    // ❗ Check canonical identity table (NOT admins)
+    // check canonical identity table
     const { data: existingUser } = await supabaseAdmin
       .from('app_users')
       .select('user_id')
@@ -66,6 +67,7 @@ router.post('/otp/request', async (req, res) => {
 
 /* =====================================================
    POST /signup/otp/verify
+   (MINIMAL FIX APPLIED)
 ===================================================== */
 router.post('/otp/verify', async (req, res) => {
   try {
@@ -91,23 +93,43 @@ router.post('/otp/verify', async (req, res) => {
     const signup = records[0];
 
     /* =========================
-       CREATE USER (CANONICAL)
+       RESOLVE USER ID (FIX)
     ========================= */
-    const userId = crypto.randomUUID();
+    let userId;
 
-    const { error: userErr } = await supabaseAdmin
+    // check if user already exists
+    const { data: existingUser, error: findErr } = await supabaseAdmin
       .from('app_users')
-      .insert({
-        user_id: userId,
-        mobile: signup.mobile,
-        email: signup.email,
-        role: 'ADMIN',
-        active: true
-      });
+      .select('user_id, role')
+      .eq('mobile', signup.mobile)
+      .maybeSingle();
 
-    if (userErr) {
-      console.error('[signup user insert failed]', userErr);
-      return res.status(500).json({ error: 'User creation failed' });
+    if (findErr) {
+      console.error('[signup user lookup failed]', findErr);
+      return res.status(500).json({ error: 'User lookup failed' });
+    }
+
+    if (existingUser) {
+      // reuse existing identity
+      userId = existingUser.user_id;
+    } else {
+      // create identity ONCE
+      userId = crypto.randomUUID();
+
+      const { error: userErr } = await supabaseAdmin
+        .from('app_users')
+        .insert({
+          user_id: userId,
+          mobile: signup.mobile,
+          email: signup.email,
+          role: 'ADMIN',
+          active: true
+        });
+
+      if (userErr) {
+        console.error('[signup user insert failed]', userErr);
+        return res.status(500).json({ error: 'User creation failed' });
+      }
     }
 
     /* =========================
