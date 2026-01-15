@@ -21,7 +21,7 @@ router.get('/companies', async (req, res) => {
     ========================= */
     const { data: user, error: userErr } = await supabaseAdmin
       .from('app_users')
-      .select('user_id, active')
+      .select('user_id')
       .eq('user_id', userId)
       .eq('active', true)
       .single();
@@ -31,12 +31,11 @@ router.get('/companies', async (req, res) => {
     }
 
     /* =========================
-       2️⃣ Fetch companies via user_companies
+       2️⃣ Fetch companies (scoped)
     ========================= */
     const { data, error } = await supabaseAdmin
       .from('user_companies')
       .select(`
-        company_id,
         companies (
           company_id,
           company_name
