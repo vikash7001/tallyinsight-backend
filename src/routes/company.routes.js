@@ -57,11 +57,10 @@ router.post('/create', async (req, res) => {
        LINK USER ↔ COMPANY
     ========================= */
     const { error: linkErr } = await supabaseAdmin
-      .from('user_companies')   // ✅ CORRECT TABLE
+      .from('user_companies')
       .insert({
         user_id: userId,
         company_id: companyId
-        
       });
 
     if (linkErr) {
@@ -77,10 +76,38 @@ router.post('/create', async (req, res) => {
     }
 
     /* =========================
+       CREATE TRIAL SUBSCRIPTION  ✅ OPTION A
+    ========================= */
+    const trialStart = new Date();
+    const trialEnd = new Date();
+    trialEnd.setDate(trialEnd.getDate() + 14); // 14-day trial
+
+    const { error: subErr } = await supabaseAdmin
+      .from('subscriptions')
+      .insert({
+        company_id: companyId,
+        status: 'TRIAL',
+        trial_start: trialStart.toISOString(),
+        trial_end: trialEnd.toISOString()
+      });
+
+    if (subErr) {
+      console.error('[subscription insert]', subErr);
+
+      // rollback everything
+      await supabaseAdmin.from('user_companies').delete().eq('company_id', companyId);
+      await supabaseAdmin.from('companies').delete().eq('company_id', companyId);
+
+      return res.status(500).json({ error: 'Subscription creation failed' });
+    }
+
+    /* =========================
        SUCCESS
     ========================= */
     return res.json({
-      company_id: companyId
+      company_id: companyId,
+      subscription: 'TRIAL',
+      trial_end: trialEnd
     });
 
   } catch (err) {
