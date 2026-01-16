@@ -44,7 +44,6 @@ router.get('/mine', async (req, res) => {
         companies (
           company_id,
           company_name,
-          status,
           created_at
         )
       `)
@@ -57,14 +56,13 @@ router.get('/mine', async (req, res) => {
 
     /* =========================
        3️⃣ Normalize response
+       (frontend expects ARRAY)
     ========================= */
     const companies = (data || [])
       .map(row => row.companies)
       .filter(Boolean);
 
-    return res.json({
-      companies
-    });
+    return res.json(companies);
 
   } catch (err) {
     console.error('GET /companies/mine ERROR:', err);
