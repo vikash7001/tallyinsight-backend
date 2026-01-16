@@ -1,19 +1,27 @@
 import express from 'express';
 import { supabaseAdmin } from '../config/supabase.js';
+import adminHeaderAuth from '../middleware/adminHeaderAuth.js';
+import { resolveUserCompany } from '../middleware/resolveUserCompany.js';
+import { checkCompanySubscription } from '../middleware/checkCompanySubscription.js';
 
 const router = express.Router();
 
+/* =========================
+   Middleware (ORDER MATTERS)
+========================= */
+router.use(adminHeaderAuth);
+router.use(resolveUserCompany);
+router.use(checkCompanySubscription);
+
+/* =========================
+   GET /images
+========================= */
 router.get('/', async (req, res) => {
   try {
-    // companyId must come from middleware (licenseGuard)
-    if (!req.companyId) {
-      return res.status(400).json({ error: 'Company not selected' });
-    }
-
     const { data, error } = await supabaseAdmin
       .from('item_images')
       .select('*')
-      .eq('company_id', req.companyId);
+      .eq('company_id', req.company_id);
 
     if (error) {
       console.error('Images fetch error:', error);

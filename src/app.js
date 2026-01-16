@@ -6,6 +6,7 @@ import cors from 'cors';
 ========================= */
 import signupRoutes from './routes/signup.routes.js';
 import adminProfileRoutes from './routes/adminProfile.js';
+import companyMineRoutes from './routes/company.mine.routes.js';
 import companyRoutes from './routes/company.routes.js';
 import subscriptionRoutes from './routes/subscriptions.js';
 
@@ -36,13 +37,6 @@ import tdlStockRoutes from './routes/tdl.stock.routes.js';
 import ledgerRoutes from './routes/ledger.route.js';
 
 /* =========================
-   MIDDLEWARE
-========================= */
-import { requireAuth } from './middleware/auth.js';
-import { licenseGuard } from './middleware/licenseGuard.js';
-import adminHeaderAuth from './middleware/adminHeaderAuth.js';
-
-/* =========================
    APP INIT
 ========================= */
 const app = express();
@@ -58,7 +52,7 @@ app.get('/health', (req, res) => {
 });
 
 /* =====================================================
-   🔓 PUBLIC / AUTH (OTP — MUST BE FIRST)
+   🔓 PUBLIC / OTP (MUST BE FIRST)
 ===================================================== */
 app.use(agentAdminOtpRequestRoutes);
 app.use(agentAdminOtpVerifyRoutes);
@@ -67,36 +61,39 @@ app.use(agentAdminOtpVerifyRoutes);
    🔓 PUBLIC / ONBOARDING
 ===================================================== */
 app.use('/signup', signupRoutes);
-app.use('/admin/profile', adminProfileRoutes);
-app.use('/companies', companyRoutes);
+app.use('/companies', companyMineRoutes);   // GET /companies/mine
+app.use('/companies', companyRoutes);       // create / edit company
 app.use('/subscriptions', subscriptionRoutes);
 
 /* =====================================================
-   🔓 AUTH / AGENT IDENTIFY
+   🔓 AUTH / IDENTIFY
 ===================================================== */
 app.use('/auth', authRoutes);
 app.use('/agent', agentIdentifyRouter);
 
 /* =====================================================
-   🔐 USER-SCOPED ROUTES
+   🏢 COMPANY-SCOPED USER ROUTES
+   (middleware INSIDE route files)
 ===================================================== */
-app.use('/stock', requireAuth, licenseGuard, stockRoutes);
-app.use('/stock', requireAuth, licenseGuard, activeStockRoutes);
-app.use('/images', requireAuth, licenseGuard, imageRoutes);
-app.use('/items', requireAuth, licenseGuard, itemsRoutes);
-app.use('/sync', requireAuth, licenseGuard, syncRoutes);
+app.use('/items', itemsRoutes);
+app.use('/stock', stockRoutes);
+app.use('/stock', activeStockRoutes);
+app.use('/images', imageRoutes);
+app.use('/sync', syncRoutes);
+app.use('/ledger', ledgerRoutes);
 
 /* =====================================================
-   🔐 ADMIN ROUTES (GUARD STARTS HERE)
+   🔐 ADMIN ROUTES
+   (adminHeaderAuth INSIDE route files)
 ===================================================== */
-app.use('/admin', adminHeaderAuth);
+app.use('/admin/profile', adminProfileRoutes);
 app.use('/admin', adminCompaniesRoutes);
 app.use('/admin', adminItemsExcelRoutes);
 app.use('/admin', adminDevicesRoutes);
 app.use('/admin', adminInstallerCompaniesRoutes);
 
 /* =====================================================
-   🤖 AGENT ROUTES (AUTHED)
+   🤖 AGENT ROUTES (DEVICE AUTH ONLY)
 ===================================================== */
 app.use('/agent', agentAuthRoutes);
 app.use('/agent', agentOtpRoutes);
@@ -107,9 +104,8 @@ app.use('/agent', agentStockRoutes);
 app.use('/agent', agentLedgerRoutes);
 
 /* =====================================================
-   🔐 TDL / LEDGER
+   🔐 TDL
 ===================================================== */
 app.use('/tdl', tdlStockRoutes);
-app.use('/ledger', ledgerRoutes);
 
 export default app;

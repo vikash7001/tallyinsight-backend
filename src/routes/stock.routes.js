@@ -1,9 +1,18 @@
 import express from 'express';
 import { supabaseAdmin } from '../config/supabase.js';
 import { log } from '../utils/logger.js';
+import adminHeaderAuth from '../middleware/adminHeaderAuth.js';
+import { resolveUserCompany } from '../middleware/resolveUserCompany.js';
+import { checkCompanySubscription } from '../middleware/checkCompanySubscription.js';
 
 const router = express.Router();
 
+/* =========================
+   Middleware (ORDER MATTERS)
+========================= */
+router.use(adminHeaderAuth);
+router.use(resolveUserCompany);
+router.use(checkCompanySubscription);
 /**
  * GET /stock
  * Read active stock

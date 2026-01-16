@@ -1,5 +1,8 @@
 import express from 'express';
 import { supabaseAdmin } from '../config/supabase.js';
+import adminHeaderAuth from '../middleware/adminHeaderAuth.js';
+import { resolveUserCompany } from '../middleware/resolveUserCompany.js';
+import { checkCompanySubscription } from '../middleware/checkCompanySubscription.js';
 
 const router = express.Router();
 

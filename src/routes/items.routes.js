@@ -1,15 +1,24 @@
 import express from 'express';
 import { supabaseAdmin } from '../config/supabase.js';
 
+import adminHeaderAuth from '../middleware/adminHeaderAuth.js';
+import { resolveUserCompany } from '../middleware/resolveUserCompany.js';
+import { checkCompanySubscription } from '../middleware/checkCompanySubscription.js';
+
 const router = express.Router();
 
-// GET /items
+/* =========================
+   Middleware (ORDER MATTERS)
+========================= */
+router.use(adminHeaderAuth);
+router.use(resolveUserCompany);
+router.use(checkCompanySubscription);
+
+/* =========================
+   GET /items
+========================= */
 router.get('/', async (req, res) => {
   try {
-    if (!req.company_id) {
-      return res.status(400).json({ error: 'Company not selected' });
-    }
-
     const { data, error } = await supabaseAdmin
       .from('items')
       .select('item_id, item_code, item_name, image_url')
@@ -26,11 +35,17 @@ router.get('/', async (req, res) => {
   }
 });
 
-// PUT /items/:item_code
+/* =========================
+   PUT /items/:item_code
+========================= */
 router.put('/:item_code', async (req, res) => {
   try {
-    if (!req.company_id) {
-      return res.status(400).json({ error: 'Company not selected' });
+    // WRITE protection (sync/write allowed only ACTIVE/TRIAL)
+    if (!['ACTIVE', 'TRIAL'].includes(req.companyStatus.status)) {
+      return res.status(403).json({
+        error: 'COMPANY_SUBSCRIPTION_INACTIVE',
+        status: req.companyStatus.status
+      });
     }
 
     const { item_code } = req.params;
