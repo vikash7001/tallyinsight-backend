@@ -1,91 +1,130 @@
 import express from 'express';
-import { supabaseAdmin } from '../config/supabase.js';
+import { db } from '../db.js';
+
+import adminHeaderAuth from '../middleware/adminHeaderAuth.js';
+import resolveUserCompany from '../middleware/resolveUserCompany.js';
 
 const router = express.Router();
 
 /* =====================================================
-   POST /subscriptions/create
+   GET /subscriptions/status
+   Get effective subscription status for company
 ===================================================== */
-router.post('/create', async (req, res) => {
-  try {
-    const userId = req.headers['x-user-id'];
-    const companyId = req.headers['x-company-id'];
-    const { plan } = req.body;
+router.get(
+  '/status',
+  adminHeaderAuth,
+  resolveUserCompany,
+  async (req, res) => {
+    try {
+      const { company_id } = req;
 
-    if (!userId || !companyId) {
-      return res.status(401).json({ error: 'Missing identity' });
-    }
+      const result = await db.query(
+        `
+        SELECT
+          status,
+          trial_start,
+          trial_end,
+          expiry_date,
+          grace_end
+        FROM subscriptions
+        WHERE company_id = $1
+        `,
+        [company_id]
+      );
 
-    if (!plan || !['trial', 'paid'].includes(plan)) {
-      return res.status(400).json({ error: 'Invalid plan' });
-    }
+      if (result.rowCount === 0) {
+        return res.json({ status: 'NO_SUBSCRIPTION' });
+      }
 
-    /* =========================
-       VERIFY USER ↔ COMPANY LINK
-    ========================= */
-    const { data: link, error: linkErr } = await supabaseAdmin
-      .from('user_companies')   // ✅ FIXED
-      .select('company_id')
-      .eq('user_id', userId)
-      .eq('company_id', companyId)
-      .single();
+      const sub = result.rows[0];
+      const today = new Date();
 
-    if (linkErr || !link) {
-      return res.status(403).json({ error: 'Unauthorized company access' });
-    }
+      let effectiveStatus = 'EXPIRED';
 
-    /* =========================
-       DUPLICATE PREVENTION
-    ========================= */
-    const { data: existing } = await supabaseAdmin
-      .from('subscriptions')
-      .select('company_id')
-      .eq('company_id', companyId)
-      .limit(1);
+      if (sub.expiry_date && new Date(sub.expiry_date) >= today) {
+        effectiveStatus = 'ACTIVE';
+      } else if (sub.trial_end && new Date(sub.trial_end) >= today) {
+        effectiveStatus = 'TRIAL';
+      } else if (sub.grace_end && new Date(sub.grace_end) >= today) {
+        effectiveStatus = 'GRACE';
+      }
 
-    if (existing && existing.length > 0) {
-      return res.status(409).json({ error: 'SUBSCRIPTION_ALREADY_EXISTS' });
-    }
-
-    /* =========================
-       PREPARE DATES
-    ========================= */
-    let trialStart = null;
-    let trialEnd = null;
-
-    if (plan === 'trial') {
-      trialStart = new Date();
-      trialEnd = new Date();
-      trialEnd.setDate(trialEnd.getDate() + 14);
-    }
-
-    /* =========================
-       CREATE SUBSCRIPTION
-    ========================= */
-    const { error: subErr } = await supabaseAdmin
-      .from('subscriptions')
-      .insert({
-        company_id: companyId,
-        status: 'ACTIVE',
-        trial_start: trialStart,
-        trial_end: trialEnd
+      res.json({
+        status: effectiveStatus,
+        trial_start: sub.trial_start,
+        trial_end: sub.trial_end,
+        expiry_date: sub.expiry_date,
+        grace_end: sub.grace_end
       });
-
-    if (subErr) {
-      console.error('[subscription create]', subErr);
-      return res.status(500).json({ error: 'Subscription creation failed' });
+    } catch (err) {
+      console.error('GET /subscriptions/status failed', err);
+      res.status(500).json({ error: 'FAILED_TO_FETCH_SUBSCRIPTION' });
     }
-
-    return res.json({
-      company_id: companyId,
-      plan,
-      trial_end: trialEnd
-    });
-
-  } catch (err) {
-    console.error('[subscriptions/create]', err);
-    return res.status(500).json({ error: 'Internal server error' });
   }
-});
+);
+
+/* =====================================================
+   POST /subscriptions/renew
+   Renew company subscription
+===================================================== */
+router.post(
+  '/renew',
+  adminHeaderAuth,
+  resolveUserCompany,
+  async (req, res) => {
+    try {
+      const { company_id } = req;
+      const { months } = req.body;
+
+      if (!months || Number(months) <= 0) {
+        return res.status(400).json({ error: 'INVALID_DURATION' });
+      }
+
+      const result = await db.query(
+        `
+        SELECT expiry_date
+        FROM subscriptions
+        WHERE company_id = $1
+        `,
+        [company_id]
+      );
+
+      if (result.rowCount === 0) {
+        return res.status(404).json({ error: 'NO_SUBSCRIPTION' });
+      }
+
+      const today = new Date();
+      const currentExpiry = result.rows[0].expiry_date;
+
+      const baseDate =
+        currentExpiry && new Date(currentExpiry) > today
+          ? new Date(currentExpiry)
+          : today;
+
+      const newExpiry = new Date(baseDate);
+      newExpiry.setMonth(newExpiry.getMonth() + Number(months));
+
+      await db.query(
+        `
+        UPDATE subscriptions
+        SET
+          expiry_date = $1,
+          grace_end = NULL,
+          status = 'ACTIVE'
+        WHERE company_id = $2
+        `,
+        [newExpiry, company_id]
+      );
+
+      res.json({
+        success: true,
+        expiry_date: newExpiry
+      });
+    } catch (err) {
+      console.error('POST /subscriptions/renew failed', err);
+      res.status(500).json({ error: 'FAILED_TO_RENEW_SUBSCRIPTION' });
+    }
+  }
+);
 
 export default router;
